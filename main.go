@@ -90,6 +90,7 @@ func SetupEnvironment() {
 func SetupLogging() {
 	logConfig := zap.NewDevelopmentConfig()
 	if isProd {
+		logConfig.Development = false
 		logConfig.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
 		logConfig.OutputPaths = []string{"stdout"}
 	}
