@@ -96,11 +96,7 @@ func SetupLogging() {
 
 func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	responseHeaders := w.Header()
-	trimmedPath := strings.Trim(r.URL.Path, "/")
-	if appConfig.IgnoreCaseInPath {
-		trimmedPath = strings.ToLower(trimmedPath)
-	}
-	redirectTarget, ok := redirectMap[trimmedPath]
+	redirectTarget, ok := RedirectTargetForRequest(r)
 	if !ok {
 		NotFoundHandler(w, r.URL.Path)
 	} else {
@@ -108,6 +104,22 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 		AddCacheControl(w)
 		http.Redirect(w, r, redirectTarget, http.StatusTemporaryRedirect)
 	}
+}
+
+func RedirectTargetForRequest(r *http.Request) (string, bool) {
+	trimmedPath := strings.Trim(r.URL.Path, "/")
+	if appConfig.IgnoreCaseInPath {
+		trimmedPath = strings.ToLower(trimmedPath)
+	}
+
+	// Try to find target by hostname if Path is empty
+	if len(trimmedPath) == 0 {
+		trimmedPath = r.Host
+	}
+
+	target, ok := redirectMap[trimmedPath]
+
+	return target, ok
 }
 
 func NotFoundHandler(w http.ResponseWriter, requestPath string) {
