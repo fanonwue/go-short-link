@@ -5,6 +5,7 @@ import (
 	"github.com/cbroglie/mustache"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
+	"log"
 	"net/http"
 	"os"
 	"slices"
@@ -67,7 +68,6 @@ func Setup() {
 	template, err := mustache.ParseFile(notFoundTemplatePath)
 	if err != nil {
 		logger.Panicf("Could not load not-found template file %s: %v", notFoundTemplatePath, err)
-		os.Exit(1)
 	}
 
 	notFoundTemplate = template
@@ -90,7 +90,10 @@ func SetupLogging() {
 		logConfig.OutputPaths = []string{"stdout"}
 	}
 	tmpLogger, _ := logConfig.Build()
-	defer tmpLogger.Sync()
+	err := tmpLogger.Sync()
+	if err != nil {
+		log.Panicf("Error creating logger: %v", err)
+	}
 	logger = tmpLogger.Sugar()
 }
 
@@ -172,6 +175,8 @@ func main() {
 
 	err := http.ListenAndServe(":"+strconv.FormatInt(int64(appConfig.Port), 10), http.HandlerFunc(ServerHandler))
 	if err != nil {
+		// Flush log buffer before returning
+		_ = logger.Sync()
 		return
 	}
 	logger.Infof("Server ready!")
