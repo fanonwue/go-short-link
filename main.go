@@ -5,7 +5,6 @@ import (
 	"github.com/cbroglie/mustache"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
-	"log"
 	"net/http"
 	"os"
 	"slices"
@@ -16,9 +15,9 @@ import (
 
 type AppConfig struct {
 	IgnoreCaseInPath bool
-	Port             int16
-	UpdatePeriod     int32
-	HttpCacheMaxAge  int32
+	Port             uint16
+	UpdatePeriod     uint32
+	HttpCacheMaxAge  uint32
 }
 
 var appConfig *AppConfig
@@ -33,26 +32,26 @@ func CreateAppConfig() {
 		ignoreCaseInPath = true
 	}
 
-	port, err := strconv.ParseInt(os.Getenv("APP_PORT"), 0, 16)
+	port, err := strconv.ParseUint(os.Getenv("APP_PORT"), 0, 16)
 	if err != nil {
 		port = 3000
 	}
 
-	updatePeriod, err := strconv.ParseInt(os.Getenv("UPDATE_PERIOD"), 0, 32)
+	updatePeriod, err := strconv.ParseUint(os.Getenv("UPDATE_PERIOD"), 0, 32)
 	if err != nil {
 		updatePeriod = 300
 	}
 
-	httpCacheMaxAge, err := strconv.ParseInt(os.Getenv("HTTP_CACHE_MAX_AGE"), 0, 32)
+	httpCacheMaxAge, err := strconv.ParseUint(os.Getenv("HTTP_CACHE_MAX_AGE"), 0, 32)
 	if err != nil {
 		httpCacheMaxAge = updatePeriod
 	}
 
 	appConfig = &AppConfig{
 		IgnoreCaseInPath: ignoreCaseInPath,
-		Port:             int16(port),
-		UpdatePeriod:     int32(updatePeriod),
-		HttpCacheMaxAge:  int32(httpCacheMaxAge),
+		Port:             uint16(port),
+		UpdatePeriod:     uint32(updatePeriod),
+		HttpCacheMaxAge:  uint32(httpCacheMaxAge),
 	}
 }
 
@@ -90,10 +89,7 @@ func SetupLogging() {
 		logConfig.OutputPaths = []string{"stdout"}
 	}
 	tmpLogger, _ := logConfig.Build()
-	err := tmpLogger.Sync()
-	if err != nil {
-		log.Panicf("Error creating logger: %v", err)
-	}
+	_ = tmpLogger.Sync()
 	logger = tmpLogger.Sugar()
 }
 
@@ -173,7 +169,7 @@ func main() {
 	Setup()
 	logger.Infof("Starting HTTP server on port %d", appConfig.Port)
 
-	err := http.ListenAndServe(":"+strconv.FormatInt(int64(appConfig.Port), 10), http.HandlerFunc(ServerHandler))
+	err := http.ListenAndServe(":"+strconv.FormatUint(uint64(appConfig.Port), 10), http.HandlerFunc(ServerHandler))
 	if err != nil {
 		// Flush log buffer before returning
 		_ = logger.Sync()
