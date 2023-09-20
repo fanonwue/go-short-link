@@ -31,18 +31,22 @@ type GoogleSheetsConfig struct {
 
 var config *GoogleSheetsConfig
 
+func CreateSheetsConfig() {
+	config = &GoogleSheetsConfig{
+		SpreadsheetId: os.Getenv("SPREADSHEET_ID"),
+		SkipFirstRow:  true,
+		LastUpdate:    time.Now(),
+		Auth: GoogleAuthConfig{
+			ProjectId:          os.Getenv("PROJECT_ID"),
+			ServiceAccountMail: os.Getenv("SERVICE_ACCOUNT_CLIENT_EMAIL"),
+			ServiceAccountKey:  GetServiceAccountPrivateKey(),
+		},
+	}
+}
+
 func GetConfig() *GoogleSheetsConfig {
 	if config == nil {
-		config = &GoogleSheetsConfig{
-			SpreadsheetId: os.Getenv("SPREADSHEET_ID"),
-			SkipFirstRow:  true,
-			LastUpdate:    time.Now(),
-			Auth: GoogleAuthConfig{
-				ProjectId:          os.Getenv("PROJECT_ID"),
-				ServiceAccountMail: os.Getenv("SERVICE_ACCOUNT_CLIENT_EMAIL"),
-				ServiceAccountKey:  GetServiceAccountPrivateKey(),
-			},
-		}
+		CreateSheetsConfig()
 	}
 	return config
 }
@@ -86,11 +90,21 @@ func SheetsService() *sheets.Service {
 	return config.SheetsService
 }
 
+func SpreadsheetWebLink() (string, error) {
+	service := DriveService()
+	file, err := service.Files.Get(config.SpreadsheetId).Fields("webViewLink").Do()
+	if err != nil {
+		logger.Warnf("Could not determine webViewLink for Spreadsheet '%s': %v", config.SpreadsheetId, err)
+		return "", err
+	}
+	return file.WebViewLink, nil
+}
+
 func NeedsUpdate() bool {
 	service := DriveService()
 	file, err := service.Files.Get(config.SpreadsheetId).Fields("modifiedTime").Do()
 	if err != nil {
-		logger.Errorf("Could not determine modifiedTime for Spreadsheet %s: %v", config.SpreadsheetId, err)
+		logger.Errorf("Could not determine modifiedTime for Spreadsheet '%s': %v", config.SpreadsheetId, err)
 		return true
 	}
 

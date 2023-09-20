@@ -58,8 +58,8 @@ func CreateAppConfig() {
 func Setup() {
 	SetupEnvironment()
 	SetupLogging()
-
 	CreateAppConfig()
+	CreateSheetsConfig()
 
 	logger.Infof("Running in production mode: %s", strconv.FormatBool(isProd))
 
@@ -70,6 +70,11 @@ func Setup() {
 	}
 
 	notFoundTemplate = template
+
+	fileWebLink, err := SpreadsheetWebLink()
+	if err == nil {
+		logger.Infof("Using document available at: %s", fileWebLink)
+	}
 
 	UpdateRedirectMapping(true)
 	go StartBackgroundUpdates()
@@ -167,8 +172,8 @@ func AddCacheControl(w http.ResponseWriter) {
 
 func main() {
 	Setup()
-	logger.Infof("Starting HTTP server on port %d", appConfig.Port)
 
+	logger.Infof("Starting HTTP server on port %d", appConfig.Port)
 	err := http.ListenAndServe(":"+strconv.FormatUint(uint64(appConfig.Port), 10), http.HandlerFunc(ServerHandler))
 	if err != nil {
 		// Flush log buffer before returning
