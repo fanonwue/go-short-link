@@ -95,7 +95,6 @@ func SetupLogging() {
 		logConfig.OutputPaths = []string{"stdout"}
 	}
 	tmpLogger, _ := logConfig.Build()
-	_ = tmpLogger.Sync()
 	logger = tmpLogger.Sugar()
 }
 
@@ -173,13 +172,11 @@ func AddCacheControl(w http.ResponseWriter) {
 
 func main() {
 	Setup()
-
+	// Flush log buffer before exitign
+	defer logger.Sync()
 	logger.Infof("Starting HTTP server on port %d", appConfig.Port)
 	err := http.ListenAndServe(":"+strconv.FormatUint(uint64(appConfig.Port), 10), http.HandlerFunc(ServerHandler))
 	if err != nil {
-		// Flush log buffer before returning
-		_ = logger.Sync()
 		return
 	}
-	logger.Infof("Server ready!")
 }
