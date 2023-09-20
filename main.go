@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/cbroglie/mustache"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
@@ -14,8 +15,9 @@ import (
 
 type AppConfig struct {
 	IgnoreCaseInPath bool
-	Port             int64
-	UpdatePeriod     int64
+	Port             int16
+	UpdatePeriod     int32
+	HttpCacheMaxAge  int32
 }
 
 var appConfig *AppConfig
@@ -24,7 +26,7 @@ var logger *zap.SugaredLogger
 var redirectMap = map[string]string{}
 var notFoundTemplate *mustache.Template
 
-func createAppConfig() {
+func CreateAppConfig() {
 	ignoreCaseInPath, err := strconv.ParseBool(os.Getenv("IGNORE_CASE_IN_PATH"))
 	if err != nil {
 		ignoreCaseInPath = true
@@ -35,23 +37,29 @@ func createAppConfig() {
 		port = 3000
 	}
 
-	updatePeriod, err := strconv.ParseInt(os.Getenv("UPDATE_PERIOD"), 0, 16)
+	updatePeriod, err := strconv.ParseInt(os.Getenv("UPDATE_PERIOD"), 0, 32)
 	if err != nil {
 		updatePeriod = 300
 	}
 
+	httpCacheMaxAge, err := strconv.ParseInt(os.Getenv("HTTP_CACHE_MAX_AGE"), 0, 32)
+	if err != nil {
+		httpCacheMaxAge = updatePeriod
+	}
+
 	appConfig = &AppConfig{
 		IgnoreCaseInPath: ignoreCaseInPath,
-		Port:             port,
-		UpdatePeriod:     updatePeriod,
+		Port:             int16(port),
+		UpdatePeriod:     int32(updatePeriod),
+		HttpCacheMaxAge:  int32(httpCacheMaxAge),
 	}
 }
 
-func setup() {
-	setupEnvironment()
-	setupLogging()
+func Setup() {
+	SetupEnvironment()
+	SetupLogging()
 
-	createAppConfig()
+	CreateAppConfig()
 
 	logger.Infof("Running in production mode: %s", strconv.FormatBool(isProd))
 
@@ -68,14 +76,14 @@ func setup() {
 	go StartBackgroundUpdates()
 }
 
-func setupEnvironment() {
+func SetupEnvironment() {
 	_ = godotenv.Load()
 	prodEnvValues := []string{"prod", "production"}
 	envValue := strings.ToLower(os.Getenv("APP_ENV"))
 	isProd = slices.Contains(prodEnvValues, envValue)
 }
 
-func setupLogging() {
+func SetupLogging() {
 	logConfig := zap.NewDevelopmentConfig()
 	if isProd {
 		logConfig.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
@@ -86,7 +94,7 @@ func setupLogging() {
 	logger = tmpLogger.Sugar()
 }
 
-func serverHandler(w http.ResponseWriter, r *http.Request) {
+func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	responseHeaders := w.Header()
 	trimmedPath := strings.Trim(r.URL.Path, "/")
 	if appConfig.IgnoreCaseInPath {
@@ -94,14 +102,15 @@ func serverHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	redirectTarget, ok := redirectMap[trimmedPath]
 	if !ok {
-		notFoundHandler(w, r.URL.Path)
+		NotFoundHandler(w, r.URL.Path)
 	} else {
 		responseHeaders["Content-Type"] = nil
+		AddCacheControl(w)
 		http.Redirect(w, r, redirectTarget, http.StatusTemporaryRedirect)
 	}
 }
 
-func notFoundHandler(w http.ResponseWriter, requestPath string) {
+func NotFoundHandler(w http.ResponseWriter, requestPath string) {
 	rendered, err := notFoundTemplate.Render(map[string]string{
 		"redirectName": requestPath,
 	})
@@ -114,6 +123,7 @@ func notFoundHandler(w http.ResponseWriter, requestPath string) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Length", strconv.Itoa(len(responseBytes)))
+	AddCacheControl(w)
 	w.WriteHeader(http.StatusNotFound)
 
 	_, err = w.Write(responseBytes)
@@ -140,11 +150,15 @@ func UpdateRedirectMapping(force bool) {
 	logger.Infof("Updated redirect mapping, number of entries: %d", len(newMap))
 }
 
+func AddCacheControl(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", appConfig.HttpCacheMaxAge))
+}
+
 func main() {
-	setup()
+	Setup()
 	logger.Infof("Starting HTTP server on port %d", appConfig.Port)
 
-	err := http.ListenAndServe(":"+strconv.FormatInt(appConfig.Port, 10), http.HandlerFunc(serverHandler))
+	err := http.ListenAndServe(":"+strconv.FormatInt(int64(appConfig.Port), 10), http.HandlerFunc(ServerHandler))
 	if err != nil {
 		return
 	}
