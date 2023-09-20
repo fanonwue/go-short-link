@@ -26,7 +26,7 @@ type GoogleSheetsConfig struct {
 	Auth          GoogleAuthConfig
 	SheetsService *sheets.Service
 	DriveService  *drive.Service
-	LastUpdate    time.Time
+	LastUpdate    *time.Time
 }
 
 var config *GoogleSheetsConfig
@@ -35,7 +35,6 @@ func CreateSheetsConfig() {
 	config = &GoogleSheetsConfig{
 		SpreadsheetId: os.Getenv("SPREADSHEET_ID"),
 		SkipFirstRow:  true,
-		LastUpdate:    time.Now(),
 		Auth: GoogleAuthConfig{
 			ProjectId:          os.Getenv("PROJECT_ID"),
 			ServiceAccountMail: os.Getenv("SERVICE_ACCOUNT_CLIENT_EMAIL"),
@@ -101,6 +100,10 @@ func SpreadsheetWebLink() (string, error) {
 }
 
 func NeedsUpdate() bool {
+	if config.LastUpdate == nil {
+		return true
+	}
+
 	service := DriveService()
 	file, err := service.Files.Get(config.SpreadsheetId).Fields("modifiedTime").Do()
 	if err != nil {
@@ -114,7 +117,7 @@ func NeedsUpdate() bool {
 		logger.Errorf("Could not parse RFC3339 timestamp %s: %v", modifiedTimeRaw, err)
 		return true
 	}
-	return modifiedTime.After(config.LastUpdate)
+	return modifiedTime.After(*config.LastUpdate)
 }
 
 func GetRedirectMapping() map[string]string {
@@ -127,6 +130,7 @@ func GetRedirectMapping() map[string]string {
 	}
 
 	mapping := map[string]string{}
+	updateTime := time.Now()
 
 	result, err := service.Spreadsheets.Values.Get(conf.SpreadsheetId, sheetsRange).Do()
 	if err != nil {
@@ -134,7 +138,7 @@ func GetRedirectMapping() map[string]string {
 		return mapping
 	}
 
-	config.LastUpdate = time.Now()
+	config.LastUpdate = &updateTime
 
 	if len(result.Values) == 0 {
 		return mapping
