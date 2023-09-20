@@ -99,13 +99,13 @@ func SetupLogging() {
 }
 
 func ServerHandler(w http.ResponseWriter, r *http.Request) {
-	responseHeaders := w.Header()
+	responseHeader := w.Header()
 	redirectTarget, ok := RedirectTargetForRequest(r)
 	if !ok {
 		NotFoundHandler(w, r.URL.Path)
 	} else {
-		responseHeaders["Content-Type"] = nil
-		AddCacheControl(w)
+		responseHeader["Content-Type"] = nil
+		AddCacheControl(&responseHeader)
 		http.Redirect(w, r, redirectTarget, http.StatusTemporaryRedirect)
 	}
 }
@@ -136,10 +136,11 @@ func NotFoundHandler(w http.ResponseWriter, requestPath string) {
 	}
 
 	responseBytes := []byte(rendered)
+	responseHeader := w.Header()
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Length", strconv.Itoa(len(responseBytes)))
-	AddCacheControl(w)
+	responseHeader.Set("Content-Type", "text/html; charset=utf-8")
+	responseHeader.Set("Content-Length", strconv.Itoa(len(responseBytes)))
+	AddCacheControl(&responseHeader)
 	w.WriteHeader(http.StatusNotFound)
 
 	_, err = w.Write(responseBytes)
@@ -166,13 +167,13 @@ func UpdateRedirectMapping(force bool) {
 	logger.Infof("Updated redirect mapping, number of entries: %d", len(newMap))
 }
 
-func AddCacheControl(w http.ResponseWriter) {
-	w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", appConfig.HttpCacheMaxAge))
+func AddCacheControl(h *http.Header) {
+	h.Set("Cache-Control", fmt.Sprintf("public, max-age=%d", appConfig.HttpCacheMaxAge))
 }
 
 func main() {
 	Setup()
-	// Flush log buffer before exitign
+	// Flush log buffer before exiting
 	defer logger.Sync()
 	logger.Infof("Starting HTTP server on port %d", appConfig.Port)
 	err := http.ListenAndServe(":"+strconv.FormatUint(uint64(appConfig.Port), 10), http.HandlerFunc(ServerHandler))
