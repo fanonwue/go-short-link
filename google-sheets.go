@@ -9,6 +9,7 @@ import (
 	"google.golang.org/api/sheets/v4"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -145,22 +146,35 @@ func GetRedirectMapping() map[string]string {
 	}
 
 	for _, row := range result.Values {
-		if len(row) == 0 {
+		if len(row) < 2 {
 			continue
 		}
 
-		key := row[0]
-		value := row[1]
+		key, ok := row[0].(string)
+		if !ok {
+			// Check if the key is a number instead
+			intKey, ok := row[0].(int)
+			if ok {
+				key = strconv.FormatInt(int64(intKey), 10)
+			} else {
+				continue
+			}
+		}
 
-		if key == nil || value == nil {
+		value, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+
+		if len(value) == 0 || len(key) == 0 {
 			continue
 		}
 
 		if appConfig.IgnoreCaseInPath {
-			key = strings.ToLower(key.(string))
+			key = strings.ToLower(key)
 		}
 
-		mapping[key.(string)] = value.(string)
+		mapping[key] = value
 	}
 
 	return mapping
