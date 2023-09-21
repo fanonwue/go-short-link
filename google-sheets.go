@@ -155,7 +155,7 @@ func GetRedirectMapping() map[string]string {
 			// Check if the key is a number instead
 			intKey, ok := row[0].(int)
 			if ok {
-				key = strconv.FormatInt(int64(intKey), 10)
+				key = strconv.Itoa(intKey)
 			} else {
 				continue
 			}
