@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+const cacheControlHeaderTemplate = "public, max-age=%d"
+
 type AppConfig struct {
 	IgnoreCaseInPath   bool
 	Port               uint16
@@ -53,7 +55,7 @@ func CreateAppConfig() {
 		Port:               uint16(port),
 		UpdatePeriod:       uint32(updatePeriod),
 		HttpCacheMaxAge:    uint32(httpCacheMaxAge),
-		CacheControlHeader: fmt.Sprintf("public, max-age=%d", httpCacheMaxAge),
+		CacheControlHeader: fmt.Sprintf(cacheControlHeaderTemplate, httpCacheMaxAge),
 	}
 }
 
