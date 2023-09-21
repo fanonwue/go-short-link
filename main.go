@@ -14,10 +14,11 @@ import (
 )
 
 type AppConfig struct {
-	IgnoreCaseInPath bool
-	Port             uint16
-	UpdatePeriod     uint32
-	HttpCacheMaxAge  uint32
+	IgnoreCaseInPath   bool
+	Port               uint16
+	UpdatePeriod       uint32
+	HttpCacheMaxAge    uint32
+	CacheControlHeader string
 }
 
 var appConfig *AppConfig
@@ -44,14 +45,15 @@ func CreateAppConfig() {
 
 	httpCacheMaxAge, err := strconv.ParseUint(os.Getenv("HTTP_CACHE_MAX_AGE"), 0, 32)
 	if err != nil {
-		httpCacheMaxAge = updatePeriod
+		httpCacheMaxAge = updatePeriod * 2
 	}
 
 	appConfig = &AppConfig{
-		IgnoreCaseInPath: ignoreCaseInPath,
-		Port:             uint16(port),
-		UpdatePeriod:     uint32(updatePeriod),
-		HttpCacheMaxAge:  uint32(httpCacheMaxAge),
+		IgnoreCaseInPath:   ignoreCaseInPath,
+		Port:               uint16(port),
+		UpdatePeriod:       uint32(updatePeriod),
+		HttpCacheMaxAge:    uint32(httpCacheMaxAge),
+		CacheControlHeader: fmt.Sprintf("public, max-age=%d", httpCacheMaxAge),
 	}
 }
 
@@ -105,7 +107,7 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 		NotFoundHandler(w, r.URL.Path)
 	} else {
 		responseHeader["Content-Type"] = nil
-		AddCacheControl(&responseHeader)
+		AddDefaultHeaders(&responseHeader)
 		http.Redirect(w, r, redirectTarget, http.StatusTemporaryRedirect)
 	}
 }
@@ -140,7 +142,7 @@ func NotFoundHandler(w http.ResponseWriter, requestPath string) {
 
 	responseHeader.Set("Content-Type", "text/html; charset=utf-8")
 	responseHeader.Set("Content-Length", strconv.Itoa(len(responseBytes)))
-	AddCacheControl(&responseHeader)
+	AddDefaultHeaders(&responseHeader)
 	w.WriteHeader(http.StatusNotFound)
 
 	_, err = w.Write(responseBytes)
@@ -167,8 +169,8 @@ func UpdateRedirectMapping(force bool) {
 	logger.Infof("Updated redirect mapping, number of entries: %d", len(newMap))
 }
 
-func AddCacheControl(h *http.Header) {
-	h.Set("Cache-Control", fmt.Sprintf("public, max-age=%d", appConfig.HttpCacheMaxAge))
+func AddDefaultHeaders(h *http.Header) {
+	h.Set("Cache-Control", appConfig.CacheControlHeader)
 }
 
 func main() {
