@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/cbroglie/mustache"
 	"github.com/joho/godotenv"
@@ -131,7 +132,8 @@ func RedirectTargetForRequest(r *http.Request) (string, bool) {
 }
 
 func NotFoundHandler(w http.ResponseWriter, requestPath string) {
-	rendered, err := notFoundTemplate.Render(map[string]string{
+	renderedBuf := bytes.Buffer{}
+	err := notFoundTemplate.FRender(&renderedBuf, map[string]string{
 		"redirectName": requestPath,
 	})
 
@@ -139,15 +141,14 @@ func NotFoundHandler(w http.ResponseWriter, requestPath string) {
 		logger.Errorf("Could not render not-found template: %v", err)
 	}
 
-	responseBytes := []byte(rendered)
 	responseHeader := w.Header()
 
 	responseHeader.Set("Content-Type", "text/html; charset=utf-8")
-	responseHeader.Set("Content-Length", strconv.Itoa(len(responseBytes)))
+	responseHeader.Set("Content-Length", strconv.Itoa(renderedBuf.Len()))
 	AddDefaultHeaders(&responseHeader)
 	w.WriteHeader(http.StatusNotFound)
 
-	_, err = w.Write(responseBytes)
+	_, err = renderedBuf.WriteTo(w)
 	if err != nil {
 		logger.Errorf("Could not write response body: %v", err)
 	}
