@@ -132,7 +132,10 @@ func RedirectTargetForRequest(r *http.Request) (string, bool) {
 }
 
 func NotFoundHandler(w http.ResponseWriter, requestPath string) {
-	renderedBuf := bytes.Buffer{}
+	var renderedBuf bytes.Buffer
+	// Pre initialize to 2KiB, as the response will be bigger than 1KiB due to the size of the template
+	renderedBuf.Grow(2048)
+
 	err := notFoundTemplate.FRender(&renderedBuf, map[string]string{
 		"redirectName": requestPath,
 	})
