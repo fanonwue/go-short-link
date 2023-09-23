@@ -24,6 +24,10 @@ type AppConfig struct {
 	CacheControlHeader string
 }
 
+type NotFoundTemplateData struct {
+	RedirectName string
+}
+
 var appConfig *AppConfig
 var isProd bool
 var logger *zap.SugaredLogger
@@ -136,8 +140,8 @@ func NotFoundHandler(w http.ResponseWriter, requestPath string) {
 	// Pre initialize to 2KiB, as the response will be bigger than 1KiB due to the size of the template
 	renderedBuf.Grow(2048)
 
-	err := notFoundTemplate.FRender(&renderedBuf, map[string]string{
-		"redirectName": requestPath,
+	err := notFoundTemplate.FRender(&renderedBuf, &NotFoundTemplateData{
+		RedirectName: requestPath,
 	})
 
 	if err != nil {
