@@ -14,19 +14,28 @@ import (
 	"time"
 )
 
-type AppConfig struct {
-	IgnoreCaseInPath   bool
-	Port               uint16
-	UpdatePeriod       uint32
-	HttpCacheMaxAge    uint32
-	CacheControlHeader string
-}
+type (
+	AppConfig struct {
+		IgnoreCaseInPath   bool
+		Port               uint16
+		UpdatePeriod       uint32
+		HttpCacheMaxAge    uint32
+		CacheControlHeader string
+	}
 
-type NotFoundTemplateData struct {
-	RedirectName string
-}
+	NotFoundTemplateData struct {
+		RedirectName string
+	}
 
-type RedirectMap map[string]string
+	// RedirectMap is a map of string keys and string values. The key is meant to be interpreted as the redirect path,
+	// which has been provided by the user, while the value represents the redirect target (as in, where the redirect)
+	// should lead to).
+	RedirectMap = map[string]string
+
+	// RedirectMapHook A function that takes a RedirectMap, processes it and returns a new RedirectMap with
+	// the processed result.
+	RedirectMapHook = func(RedirectMap) RedirectMap
+)
 
 const (
 	cacheControlHeaderTemplate = "public, max-age=%d"
@@ -37,7 +46,7 @@ var (
 	isProd           bool
 	logger           *zap.SugaredLogger
 	redirectMap      = RedirectMap{}
-	redirectMapHooks = make([]func(RedirectMap) RedirectMap, 0)
+	redirectMapHooks = make([]RedirectMapHook, 0)
 	notFoundTemplate *mustache.Template
 )
 
@@ -205,7 +214,7 @@ func AddDefaultHeaders(h *http.Header) {
 	h.Set("Cache-Control", appConfig.CacheControlHeader)
 }
 
-func addRedirectMapHook(hook func(RedirectMap) RedirectMap) {
+func addRedirectMapHook(hook RedirectMapHook) {
 	redirectMapHooks = append(redirectMapHooks, hook)
 }
 
