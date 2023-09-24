@@ -258,6 +258,16 @@ func addDefaultRedirectMapHooks() {
 		}
 	}
 
+	logger.Debug("Adding update hook to strip leading and trailing slashes from redirect paths")
+	redirectState.AddHook(func(originalMap RedirectMap) RedirectMap {
+		for key := range originalMap {
+			modifyKey(originalMap, key, func(s string) string {
+				return strings.Trim(s, "/")
+			})
+		}
+		return originalMap
+	})
+
 	if appConfig.IgnoreCaseInPath {
 		logger.Debug("Adding update hook to make redirect paths lowercase")
 		redirectState.AddHook(func(originalMap RedirectMap) RedirectMap {
