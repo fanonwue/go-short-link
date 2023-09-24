@@ -38,7 +38,7 @@ var (
 	notFoundTemplate *mustache.Template
 )
 
-func CreateAppConfig() {
+func CreateAppConfig() *AppConfig {
 	ignoreCaseInPath, err := strconv.ParseBool(os.Getenv("IGNORE_CASE_IN_PATH"))
 	if err != nil {
 		ignoreCaseInPath = true
@@ -66,6 +66,8 @@ func CreateAppConfig() {
 		HttpCacheMaxAge:    uint32(httpCacheMaxAge),
 		CacheControlHeader: fmt.Sprintf(cacheControlHeaderTemplate, httpCacheMaxAge),
 	}
+
+	return appConfig
 }
 
 func Setup() {

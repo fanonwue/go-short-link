@@ -90,7 +90,7 @@ func (conf *GoogleSheetsConfig) SheetsService() *sheets.Service {
 	return conf.sheetsService
 }
 
-func CreateSheetsConfig() {
+func CreateSheetsConfig() *GoogleSheetsConfig {
 	config = &GoogleSheetsConfig{
 		SpreadsheetId: os.Getenv("SPREADSHEET_ID"),
 		SkipFirstRow:  true,
@@ -101,6 +101,7 @@ func CreateSheetsConfig() {
 			ServiceAccountKeyId: os.Getenv("SERVICE_ACCOUNT_PRIVATE_KEY_ID"),
 		},
 	}
+	return config
 }
 
 func getServiceAccountPrivateKey() []byte {
@@ -165,13 +166,6 @@ func readPrivateKeyData(trimWhitespace bool) []byte {
 	} else {
 		return keyData
 	}
-}
-
-func GetConfig() *GoogleSheetsConfig {
-	if config == nil {
-		CreateSheetsConfig()
-	}
-	return config
 }
 
 func SpreadsheetWebLink() (string, error) {
