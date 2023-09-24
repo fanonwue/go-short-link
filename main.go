@@ -62,15 +62,17 @@ var (
 func (state *RedirectMapState) UpdateMapping(newMap RedirectMap) {
 	// Synchronize using a mutex to prevent race conditions
 	state.mutex.Lock()
+	// Defer unlock to make sure it always happens, regardless of panics etc.
+	defer state.mutex.Unlock()
 	state.mapping = newMap
-	state.mutex.Unlock()
 }
 
 func (state *RedirectMapState) GetTarget(key string) (string, bool) {
 	// Synchronize using a mutex to prevent race conditions
 	state.mutex.RLock()
+	// Defer unlock to make sure it always happens, regardless of panics etc.
+	defer state.mutex.RUnlock()
 	target, ok := state.mapping[key]
-	state.mutex.RUnlock()
 	return target, ok
 }
 
