@@ -15,33 +15,88 @@ import (
 )
 
 type GoogleAuthConfig struct {
-	ProjectId          string
-	ServiceAccountMail string
-	ServiceAccountKey  []byte
-	KeyId              string
+	ProjectId           string
+	ServiceAccountMail  string
+	ServiceAccountKey   []byte
+	ServiceAccountKeyId string
 }
 
 type GoogleSheetsConfig struct {
 	SpreadsheetId string
 	SkipFirstRow  bool
 	Auth          GoogleAuthConfig
-	SheetsService *sheets.Service
-	DriveService  *drive.Service
 	LastUpdate    *time.Time
+	httpClient    *http.Client
+	sheetsService *sheets.Service
+	driveService  *drive.Service
 }
 
 var config *GoogleSheetsConfig
+
+func (conf *GoogleSheetsConfig) getClient() *http.Client {
+	if conf.httpClient == nil {
+		jwtConfig := &jwt.Config{
+			Email:      conf.Auth.ServiceAccountMail,
+			PrivateKey: conf.Auth.ServiceAccountKey,
+			TokenURL:   google.JWTTokenURL,
+			Scopes: []string{
+				"https://www.googleapis.com/auth/drive.metadata.readonly",
+				"https://www.googleapis.com/auth/spreadsheets.readonly",
+			},
+		}
+
+		keyId := conf.Auth.ServiceAccountKeyId
+		if len(keyId) > 0 {
+			jwtConfig.PrivateKeyID = keyId
+		}
+
+		conf.httpClient = jwtConfig.Client(context.Background())
+	}
+
+	return conf.httpClient
+}
+
+func (conf *GoogleSheetsConfig) DriveService() *drive.Service {
+	if conf.driveService == nil {
+		newService, err := drive.NewService(context.Background(), option.WithHTTPClient(conf.getClient()))
+		if err != nil {
+			logger.Panicf("Could not create drive service: %v", err)
+		} else {
+			conf.driveService = newService
+		}
+	}
+	return conf.driveService
+}
+
+func (conf *GoogleSheetsConfig) SheetsService() *sheets.Service {
+	if conf.sheetsService == nil {
+		newService, err := sheets.NewService(context.Background(), option.WithHTTPClient(conf.getClient()))
+		if err != nil {
+			logger.Panicf("Could not create sheets service: %v", err)
+		} else {
+			conf.sheetsService = newService
+		}
+	}
+	return conf.sheetsService
+}
 
 func CreateSheetsConfig() {
 	config = &GoogleSheetsConfig{
 		SpreadsheetId: os.Getenv("SPREADSHEET_ID"),
 		SkipFirstRow:  true,
 		Auth: GoogleAuthConfig{
-			ProjectId:          os.Getenv("PROJECT_ID"),
-			ServiceAccountMail: os.Getenv("SERVICE_ACCOUNT_CLIENT_EMAIL"),
-			ServiceAccountKey:  GetServiceAccountPrivateKey(),
+			ProjectId:           os.Getenv("PROJECT_ID"),
+			ServiceAccountMail:  os.Getenv("SERVICE_ACCOUNT_CLIENT_EMAIL"),
+			ServiceAccountKey:   getServiceAccountPrivateKey(),
+			ServiceAccountKeyId: os.Getenv("SERVICE_ACCOUNT_PRIVATE_KEY_ID"),
 		},
 	}
+}
+
+func getServiceAccountPrivateKey() []byte {
+	rawKey := os.Getenv("SERVICE_ACCOUNT_PRIVATE_KEY")
+	key := strings.Replace(rawKey, "\\n", "\n", -1)
+	return []byte(key)
 }
 
 func GetConfig() *GoogleSheetsConfig {
@@ -51,47 +106,8 @@ func GetConfig() *GoogleSheetsConfig {
 	return config
 }
 
-func GetClient() *http.Client {
-	conf := GetConfig().Auth
-	jwtConfig := &jwt.Config{
-		Email:      conf.ServiceAccountMail,
-		PrivateKey: conf.ServiceAccountKey,
-		TokenURL:   google.JWTTokenURL,
-		Scopes: []string{
-			"https://www.googleapis.com/auth/drive.metadata.readonly",
-			"https://www.googleapis.com/auth/spreadsheets.readonly",
-		},
-	}
-
-	return jwtConfig.Client(context.Background())
-}
-
-func DriveService() *drive.Service {
-	if config.DriveService == nil {
-		newService, err := drive.NewService(context.Background(), option.WithHTTPClient(GetClient()))
-		if err != nil {
-			logger.Panicf("Could not create drive service: %v", err)
-		} else {
-			config.DriveService = newService
-		}
-	}
-	return config.DriveService
-}
-
-func SheetsService() *sheets.Service {
-	if config.SheetsService == nil {
-		newService, err := sheets.NewService(context.Background(), option.WithHTTPClient(GetClient()))
-		if err != nil {
-			logger.Panicf("Could not create sheets service: %v", err)
-		} else {
-			config.SheetsService = newService
-		}
-	}
-	return config.SheetsService
-}
-
 func SpreadsheetWebLink() (string, error) {
-	service := DriveService()
+	service := config.DriveService()
 	file, err := service.Files.Get(config.SpreadsheetId).Fields("webViewLink").Do()
 	if err != nil {
 		logger.Warnf("Could not determine webViewLink for Spreadsheet '%s': %v", config.SpreadsheetId, err)
@@ -105,7 +121,7 @@ func NeedsUpdate() bool {
 		return true
 	}
 
-	service := DriveService()
+	service := config.DriveService()
 	file, err := service.Files.Get(config.SpreadsheetId).Fields("modifiedTime").Do()
 	if err != nil {
 		logger.Errorf("Could not determine modifiedTime for Spreadsheet '%s': %v", config.SpreadsheetId, err)
@@ -123,7 +139,7 @@ func NeedsUpdate() bool {
 
 func GetRedirectMapping() map[string]string {
 	conf := GetConfig()
-	service := SheetsService()
+	service := config.SheetsService()
 
 	sheetsRange := "A2:B"
 	if !conf.SkipFirstRow {
@@ -178,10 +194,4 @@ func GetRedirectMapping() map[string]string {
 	}
 
 	return mapping
-}
-
-func GetServiceAccountPrivateKey() []byte {
-	rawKey := os.Getenv("SERVICE_ACCOUNT_PRIVATE_KEY")
-	key := strings.Replace(rawKey, "\\n", "\n", -1)
-	return []byte(key)
 }

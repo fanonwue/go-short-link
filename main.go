@@ -14,8 +14,6 @@ import (
 	"time"
 )
 
-const cacheControlHeaderTemplate = "public, max-age=%d"
-
 type AppConfig struct {
 	IgnoreCaseInPath   bool
 	Port               uint16
@@ -28,11 +26,17 @@ type NotFoundTemplateData struct {
 	RedirectName string
 }
 
-var appConfig *AppConfig
-var isProd bool
-var logger *zap.SugaredLogger
-var redirectMap = map[string]string{}
-var notFoundTemplate *mustache.Template
+const (
+	cacheControlHeaderTemplate = "public, max-age=%d"
+)
+
+var (
+	appConfig        *AppConfig
+	isProd           bool
+	logger           *zap.SugaredLogger
+	redirectMap      = map[string]string{}
+	notFoundTemplate *mustache.Template
+)
 
 func CreateAppConfig() {
 	ignoreCaseInPath, err := strconv.ParseBool(os.Getenv("IGNORE_CASE_IN_PATH"))
