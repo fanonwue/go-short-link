@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -35,6 +36,12 @@ type (
 	// RedirectMapHook A function that takes a RedirectMap, processes it and returns a new RedirectMap with
 	// the processed result.
 	RedirectMapHook = func(RedirectMap) RedirectMap
+
+	RedirectMapState struct {
+		mapping *RedirectMap
+		hooks   *[]RedirectMapHook
+		mutex   sync.RWMutex
+	}
 )
 
 const (
@@ -42,13 +49,39 @@ const (
 )
 
 var (
-	appConfig        *AppConfig
-	isProd           bool
-	logger           *zap.SugaredLogger
-	redirectMap      = RedirectMap{}
-	redirectMapHooks = make([]RedirectMapHook, 0)
+	appConfig     *AppConfig
+	isProd        bool
+	logger        *zap.SugaredLogger
+	redirectState = RedirectMapState{
+		mapping: new(RedirectMap),
+		hooks:   new([]RedirectMapHook),
+	}
 	notFoundTemplate *mustache.Template
 )
+
+func (state *RedirectMapState) UpdateMapping(newMap RedirectMap) {
+	// Synchronize using a mutex to prevent race conditions
+	state.mutex.Lock()
+	state.mapping = &newMap
+	state.mutex.Unlock()
+}
+
+func (state *RedirectMapState) GetTarget(key string) (string, bool) {
+	// Synchronize using a mutex to prevent race conditions
+	state.mutex.RLock()
+	target, ok := (*state.mapping)[key]
+	state.mutex.RUnlock()
+	return target, ok
+}
+
+func (state *RedirectMapState) Hooks() []RedirectMapHook {
+	return *state.hooks
+}
+
+func (state *RedirectMapState) AddHook(hook RedirectMapHook) {
+	newHooks := append(*state.hooks, hook)
+	state.hooks = &newHooks
+}
 
 func CreateAppConfig() *AppConfig {
 	ignoreCaseInPath, err := strconv.ParseBool(os.Getenv("IGNORE_CASE_IN_PATH"))
@@ -153,9 +186,7 @@ func RedirectTargetForRequest(r *http.Request) (string, bool) {
 		trimmedPath = r.Host
 	}
 
-	target, ok := redirectMap[trimmedPath]
-
-	return target, ok
+	return redirectState.GetTarget(trimmedPath)
 }
 
 func NotFoundHandler(w http.ResponseWriter, requestPath string) {
@@ -202,11 +233,12 @@ func UpdateRedirectMapping(force bool) {
 
 	var newMap = fetchedMapping
 
-	for _, hook := range redirectMapHooks {
+	for _, hook := range redirectState.Hooks() {
 		newMap = hook(newMap)
 	}
 
-	redirectMap = newMap
+	redirectState.UpdateMapping(newMap)
+
 	logger.Infof("Updated redirect mapping, number of entries: %d", len(newMap))
 }
 
@@ -214,13 +246,9 @@ func AddDefaultHeaders(h *http.Header) {
 	h.Set("Cache-Control", appConfig.CacheControlHeader)
 }
 
-func addRedirectMapHook(hook RedirectMapHook) {
-	redirectMapHooks = append(redirectMapHooks, hook)
-}
-
 func addDefaultRedirectMapHooks() {
 	if appConfig.IgnoreCaseInPath {
-		addRedirectMapHook(func(originalMap RedirectMap) RedirectMap {
+		redirectState.AddHook(func(originalMap RedirectMap) RedirectMap {
 			// Allocate new map with enough space for all entries after their keys have been made lowercase
 			newMap := make(RedirectMap, len(originalMap))
 			for key, value := range originalMap {
