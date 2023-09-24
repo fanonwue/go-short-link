@@ -46,6 +46,8 @@ type (
 
 const (
 	cacheControlHeaderTemplate = "public, max-age=%d"
+	defaultUpdatePeriod        = 300
+	minimumUpdatePeriod        = 15
 )
 
 var (
@@ -98,7 +100,13 @@ func CreateAppConfig() *AppConfig {
 
 	updatePeriod, err := strconv.ParseUint(os.Getenv("UPDATE_PERIOD"), 0, 32)
 	if err != nil {
-		updatePeriod = 300
+		updatePeriod = defaultUpdatePeriod
+	}
+	if updatePeriod < minimumUpdatePeriod {
+		logger.Warnf(
+			"UPDATE_PERIOD set to less than %d seconds (minimum), setting it to %d seconds (default)",
+			minimumUpdatePeriod, defaultUpdatePeriod)
+		updatePeriod = defaultUpdatePeriod
 	}
 
 	httpCacheMaxAge, err := strconv.ParseUint(os.Getenv("HTTP_CACHE_MAX_AGE"), 0, 32)
