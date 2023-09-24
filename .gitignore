@@ -1,7 +1,6 @@
 .env
 .idea
-go-short-link
-go-short-link.exe
+/bin
 *.exe
 *.pem
 *.key
