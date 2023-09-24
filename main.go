@@ -178,17 +178,22 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func RedirectTargetForRequest(r *http.Request) (string, bool) {
-	trimmedPath := strings.Trim(r.URL.Path, "/")
-	if appConfig.IgnoreCaseInPath {
-		trimmedPath = strings.ToLower(trimmedPath)
-	}
+	normalizedPath := normalizeRedirectPath(r.URL.Path)
 
 	// Try to find target by hostname if Path is empty
-	if len(trimmedPath) == 0 {
-		trimmedPath = r.Host
+	if len(normalizedPath) == 0 {
+		normalizedPath = normalizeRedirectPath(r.Host)
 	}
 
-	return redirectState.GetTarget(trimmedPath)
+	return redirectState.GetTarget(normalizedPath)
+}
+
+func normalizeRedirectPath(path string) string {
+	path = strings.Trim(path, "/")
+	if appConfig.IgnoreCaseInPath {
+		path = strings.ToLower(path)
+	}
+	return path
 }
 
 func NotFoundHandler(w http.ResponseWriter, requestPath string) {
