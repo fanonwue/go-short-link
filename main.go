@@ -38,8 +38,8 @@ type (
 	RedirectMapHook = func(RedirectMap) RedirectMap
 
 	RedirectMapState struct {
-		mapping *RedirectMap
-		hooks   *[]RedirectMapHook
+		mapping RedirectMap
+		hooks   []RedirectMapHook
 		mutex   sync.RWMutex
 	}
 )
@@ -53,8 +53,8 @@ var (
 	isProd        bool
 	logger        *zap.SugaredLogger
 	redirectState = RedirectMapState{
-		mapping: new(RedirectMap),
-		hooks:   new([]RedirectMapHook),
+		mapping: RedirectMap{},
+		hooks:   make([]RedirectMapHook, 0),
 	}
 	notFoundTemplate *mustache.Template
 )
@@ -62,25 +62,25 @@ var (
 func (state *RedirectMapState) UpdateMapping(newMap RedirectMap) {
 	// Synchronize using a mutex to prevent race conditions
 	state.mutex.Lock()
-	state.mapping = &newMap
+	state.mapping = newMap
 	state.mutex.Unlock()
 }
 
 func (state *RedirectMapState) GetTarget(key string) (string, bool) {
 	// Synchronize using a mutex to prevent race conditions
 	state.mutex.RLock()
-	target, ok := (*state.mapping)[key]
+	target, ok := state.mapping[key]
 	state.mutex.RUnlock()
 	return target, ok
 }
 
 func (state *RedirectMapState) Hooks() []RedirectMapHook {
-	return *state.hooks
+	return state.hooks
 }
 
 func (state *RedirectMapState) AddHook(hook RedirectMapHook) {
-	newHooks := append(*state.hooks, hook)
-	state.hooks = &newHooks
+	newHooks := append(state.hooks, hook)
+	state.hooks = newHooks
 }
 
 func CreateAppConfig() *AppConfig {
