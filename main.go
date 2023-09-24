@@ -18,6 +18,7 @@ import (
 type (
 	AppConfig struct {
 		IgnoreCaseInPath   bool
+		ShowServerHeader   bool
 		Port               uint16
 		UpdatePeriod       uint32
 		HttpCacheMaxAge    uint32
@@ -45,6 +46,7 @@ type (
 )
 
 const (
+	serverIdentifierHeader     = "go-short-link"
 	cacheControlHeaderTemplate = "public, max-age=%d"
 	defaultUpdatePeriod        = 300
 	minimumUpdatePeriod        = 15
@@ -93,6 +95,11 @@ func CreateAppConfig() *AppConfig {
 		ignoreCaseInPath = true
 	}
 
+	showServerHeader, err := strconv.ParseBool(os.Getenv("SHOW_SERVER_HEADER"))
+	if err != nil {
+		showServerHeader = true
+	}
+
 	port, err := strconv.ParseUint(os.Getenv("APP_PORT"), 0, 16)
 	if err != nil {
 		port = 3000
@@ -116,6 +123,7 @@ func CreateAppConfig() *AppConfig {
 
 	appConfig = &AppConfig{
 		IgnoreCaseInPath:   ignoreCaseInPath,
+		ShowServerHeader:   showServerHeader,
 		Port:               uint16(port),
 		UpdatePeriod:       uint32(updatePeriod),
 		HttpCacheMaxAge:    uint32(httpCacheMaxAge),
@@ -180,7 +188,7 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 		NotFoundHandler(w, r.URL.Path)
 	} else {
 		responseHeader["Content-Type"] = nil
-		AddDefaultHeaders(&responseHeader)
+		AddDefaultHeaders(responseHeader)
 		http.Redirect(w, r, redirectTarget, http.StatusTemporaryRedirect)
 	}
 }
@@ -221,7 +229,7 @@ func NotFoundHandler(w http.ResponseWriter, requestPath string) {
 
 	responseHeader.Set("Content-Type", "text/html; charset=utf-8")
 	responseHeader.Set("Content-Length", strconv.Itoa(renderedBuf.Len()))
-	AddDefaultHeaders(&responseHeader)
+	AddDefaultHeaders(responseHeader)
 	w.WriteHeader(http.StatusNotFound)
 
 	_, err = renderedBuf.WriteTo(w)
@@ -257,8 +265,11 @@ func UpdateRedirectMapping(force bool) {
 	logger.Infof("Updated redirect mapping, number of entries: %d", len(newMap))
 }
 
-func AddDefaultHeaders(h *http.Header) {
+func AddDefaultHeaders(h http.Header) {
 	h.Set("Cache-Control", appConfig.CacheControlHeader)
+	if appConfig.ShowServerHeader {
+		h.Set("Server", serverIdentifierHeader)
+	}
 }
 
 func addDefaultRedirectMapHooks() {
