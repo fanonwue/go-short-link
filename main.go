@@ -249,14 +249,25 @@ func AddDefaultHeaders(h *http.Header) {
 }
 
 func addDefaultRedirectMapHooks() {
+	modifyKey := func(redirectMap RedirectMap, key string, keyModifierFunc func(string) string) {
+		newKey := keyModifierFunc(key)
+		if key != newKey {
+			value := redirectMap[key]
+			delete(redirectMap, key)
+			redirectMap[newKey] = value
+		}
+	}
+
 	if appConfig.IgnoreCaseInPath {
+		logger.Debug("Adding update hook to make redirect paths lowercase")
 		redirectState.AddHook(func(originalMap RedirectMap) RedirectMap {
-			// Allocate new map with enough space for all entries after their keys have been made lowercase
-			newMap := make(RedirectMap, len(originalMap))
-			for key, value := range originalMap {
-				newMap[strings.ToLower(key)] = value
+			// Edit map in place
+			for key := range originalMap {
+				modifyKey(originalMap, key, func(s string) string {
+					return strings.ToLower(s)
+				})
 			}
-			return newMap
+			return originalMap
 		})
 	}
 }
