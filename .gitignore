@@ -1,3 +1,5 @@
 .env
 .idea
 go-short-link
+go-short-link.exe
+*.exe

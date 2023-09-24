@@ -6,6 +6,10 @@ ifneq (, $(filter $(TARGET), $(PROD_TARGETS)))
 	LD_FLAGS := -w -s
 endif
 
+EXECUTABLE_NAME := go-short-link
+ifeq ($(GOOS), windows)
+	EXECUTABLE_NAME := $(EXECUTABLE_NAME).exe
+endif
 
 build:
-	go build -o bin/go-short-link --ldflags="$(LD_FLAGS)"
+	go build -o bin/$(EXECUTABLE_NAME) --ldflags="$(LD_FLAGS)"
