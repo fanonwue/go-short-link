@@ -10,6 +10,7 @@ import (
 	"google.golang.org/api/sheets/v4"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -142,6 +143,11 @@ func readPrivateKeyData(trimWhitespace bool) []byte {
 			// Assume standard keyfile location
 			logger.Debugf("Keyfile location not set, assuming default location: %s", defaultKeyFilePath)
 			keyFile = defaultKeyFilePath
+		}
+
+		keyFile, err := filepath.Abs(keyFile)
+		if err != nil {
+			logger.Panicf("Could not create absolute path from path: %v", err)
 		}
 
 		logger.Infof("Trying to read keyfile from path: %s", keyFile)
