@@ -199,7 +199,7 @@ func NeedsUpdate() bool {
 	return modifiedTime.After(*config.LastUpdate)
 }
 
-func FetchRedirectMapping() map[string]string {
+func FetchRedirectMapping() RedirectMap {
 	service := config.SheetsService()
 
 	sheetsRange := "A2:B"
@@ -207,7 +207,7 @@ func FetchRedirectMapping() map[string]string {
 		sheetsRange = "A:B"
 	}
 
-	mapping := map[string]string{}
+	mapping := RedirectMap{}
 	updateTime := time.Now()
 
 	result, err := service.Spreadsheets.Values.Get(config.SpreadsheetId, sheetsRange).Do()

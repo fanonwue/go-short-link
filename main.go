@@ -26,6 +26,8 @@ type NotFoundTemplateData struct {
 	RedirectName string
 }
 
+type RedirectMap map[string]string
+
 const (
 	cacheControlHeaderTemplate = "public, max-age=%d"
 )
@@ -34,7 +36,8 @@ var (
 	appConfig        *AppConfig
 	isProd           bool
 	logger           *zap.SugaredLogger
-	redirectMap      = map[string]string{}
+	redirectMap      = RedirectMap{}
+	redirectMapHooks = make([]func(RedirectMap) RedirectMap, 0)
 	notFoundTemplate *mustache.Template
 )
 
@@ -78,6 +81,8 @@ func Setup() {
 
 	CreateAppConfig()
 	CreateSheetsConfig()
+
+	addDefaultRedirectMapHooks()
 
 	notFoundTemplatePath := "./resources/not-found.mustache"
 	template, err := mustache.ParseFile(notFoundTemplatePath)
@@ -186,16 +191,10 @@ func UpdateRedirectMapping(force bool) {
 
 	fetchedMapping := FetchRedirectMapping()
 
-	var newMap map[string]string
-	// Make keys lower case if "IgnoreCaseInPath" is set
-	if appConfig.IgnoreCaseInPath {
-		// Allocate new map with enough space for all entries after their keys have been made lowercase
-		newMap = make(map[string]string, len(fetchedMapping))
-		for key, value := range fetchedMapping {
-			newMap[strings.ToLower(key)] = value
-		}
-	} else {
-		newMap = fetchedMapping
+	var newMap = fetchedMapping
+
+	for _, hook := range redirectMapHooks {
+		newMap = hook(newMap)
 	}
 
 	redirectMap = newMap
@@ -204,6 +203,23 @@ func UpdateRedirectMapping(force bool) {
 
 func AddDefaultHeaders(h *http.Header) {
 	h.Set("Cache-Control", appConfig.CacheControlHeader)
+}
+
+func addRedirectMapHook(hook func(RedirectMap) RedirectMap) {
+	redirectMapHooks = append(redirectMapHooks, hook)
+}
+
+func addDefaultRedirectMapHooks() {
+	if appConfig.IgnoreCaseInPath {
+		addRedirectMapHook(func(originalMap RedirectMap) RedirectMap {
+			// Allocate new map with enough space for all entries after their keys have been made lowercase
+			newMap := make(RedirectMap, len(originalMap))
+			for key, value := range originalMap {
+				newMap[strings.ToLower(key)] = value
+			}
+			return newMap
+		})
+	}
 }
 
 func main() {
