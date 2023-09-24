@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
@@ -31,7 +32,15 @@ type GoogleSheetsConfig struct {
 	driveService  *drive.Service
 }
 
-var config *GoogleSheetsConfig
+const (
+	// If enabled, the read key will be validated to make sure it is a PEM-formatted key
+	validateKeyContent = false
+	defaultKeyFilePath = "secret/privateKey.pem"
+)
+
+var (
+	config *GoogleSheetsConfig
+)
 
 func (conf *GoogleSheetsConfig) getClient() *http.Client {
 	if conf.httpClient == nil {
@@ -94,24 +103,62 @@ func CreateSheetsConfig() {
 }
 
 func getServiceAccountPrivateKey() []byte {
-	rawKey := os.Getenv("SERVICE_ACCOUNT_PRIVATE_KEY")
-	if len(rawKey) > 0 {
-		key := strings.Replace(rawKey, "\\n", "\n", -1)
-		return []byte(key)
+	// Read private key from env or file, and trim whitespace just to be sure
+	var keyData = readPrivateKeyData(true)
+
+	if len(keyData) < 100 {
+		logger.Warnf("Keyfile smaller than 100 Bytes! This is probably unintended. Length: %d", len(keyData))
 	}
 
-	keyFile := os.Getenv("SERVICE_ACCOUNT_PRIVATE_KEY_FILE")
-	if len(keyFile) == 0 {
-		// Assume standard keyfile location
-		keyFile = "secret/privateKey.pem"
-	}
+	if validateKeyContent {
+		logger.Debug("Key validation enabled, performing checks")
+		keyString := string(keyData)
 
-	keyData, err := os.ReadFile(keyFile)
-	if err != nil {
-		logger.Panicf("Error reading keyfile: %v", err)
+		keyPrefix := "-----BEGIN PRIVATE KEY-----"
+		if !strings.HasPrefix(keyString, keyPrefix) {
+			logger.Panicf("Key does not start with expected prefix: %s", keyPrefix)
+		}
+
+		keySuffix := "-----END PRIVATE KEY-----"
+		if !strings.HasSuffix(keyString, keySuffix) {
+			logger.Panicf("Key does not end with expected suffix: %s", keySuffix)
+		}
+	} else {
+		logger.Debug("Key validation disabled, skipping checks")
 	}
 
 	return keyData
+}
+
+func readPrivateKeyData(trimWhitespace bool) []byte {
+	var keyData []byte
+	rawKey := os.Getenv("SERVICE_ACCOUNT_PRIVATE_KEY")
+	if len(rawKey) > 0 {
+		key := strings.Replace(rawKey, "\\n", "\n", -1)
+		keyData = []byte(key)
+	} else {
+		keyFile := os.Getenv("SERVICE_ACCOUNT_PRIVATE_KEY_FILE")
+		if len(keyFile) == 0 {
+			// Assume standard keyfile location
+			logger.Debugf("Keyfile location not set, assuming default location: %s", defaultKeyFilePath)
+			keyFile = defaultKeyFilePath
+		}
+
+		logger.Debugf("Trying to read keyfile from path: %s", keyFile)
+		fileContent, err := os.ReadFile(keyFile)
+		if err != nil {
+			logger.Panicf("Error reading keyfile: %v", err)
+		}
+		logger.Debugf("Read keyfile, length: %d bytes", len(fileContent))
+
+		keyData = fileContent
+	}
+
+	if trimWhitespace {
+		return bytes.TrimSpace(keyData)
+	} else {
+		return keyData
+	}
 }
 
 func GetConfig() *GoogleSheetsConfig {

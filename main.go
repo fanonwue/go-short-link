@@ -71,10 +71,11 @@ func CreateAppConfig() {
 func Setup() {
 	SetupEnvironment()
 	SetupLogging()
-	CreateAppConfig()
-	CreateSheetsConfig()
 
 	logger.Infof("Running in production mode: %s", strconv.FormatBool(isProd))
+
+	CreateAppConfig()
+	CreateSheetsConfig()
 
 	notFoundTemplatePath := "./resources/not-found.mustache"
 	template, err := mustache.ParseFile(notFoundTemplatePath)
@@ -108,6 +109,8 @@ func SetupLogging() {
 		logConfig.OutputPaths = []string{"stdout"}
 	}
 	tmpLogger, _ := logConfig.Build()
+	// Make sure to flush logger to avoid mangled output
+	defer tmpLogger.Sync()
 	logger = tmpLogger.Sugar()
 }
 

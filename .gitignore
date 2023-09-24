@@ -5,3 +5,4 @@ go-short-link.exe
 *.exe
 *.pem
 *.key
+secret/
