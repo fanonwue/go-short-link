@@ -95,8 +95,23 @@ func CreateSheetsConfig() {
 
 func getServiceAccountPrivateKey() []byte {
 	rawKey := os.Getenv("SERVICE_ACCOUNT_PRIVATE_KEY")
-	key := strings.Replace(rawKey, "\\n", "\n", -1)
-	return []byte(key)
+	if len(rawKey) > 0 {
+		key := strings.Replace(rawKey, "\\n", "\n", -1)
+		return []byte(key)
+	}
+
+	keyFile := os.Getenv("SERVICE_ACCOUNT_PRIVATE_KEY_FILE")
+	if len(keyFile) == 0 {
+		// Assume standard keyfile location
+		keyFile = "secret/privateKey.pem"
+	}
+
+	keyData, err := os.ReadFile(keyFile)
+	if err != nil {
+		logger.Panicf("Error reading keyfile: %v", err)
+	}
+
+	return keyData
 }
 
 func GetConfig() *GoogleSheetsConfig {

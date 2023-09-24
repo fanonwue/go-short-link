@@ -3,3 +3,5 @@
 go-short-link
 go-short-link.exe
 *.exe
+*.pem
+*.key
