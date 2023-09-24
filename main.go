@@ -181,7 +181,21 @@ func UpdateRedirectMapping(force bool) {
 		logger.Debugf("File has not changed since last update, skipping update")
 		return
 	}
-	newMap := GetRedirectMapping()
+
+	fetchedMapping := FetchRedirectMapping()
+
+	var newMap map[string]string
+	// Make keys lower case if "IgnoreCaseInPath" is set
+	if appConfig.IgnoreCaseInPath {
+		// Allocate new map with enough space for all entries after their keys have been made lowercase
+		newMap = make(map[string]string, len(fetchedMapping))
+		for key, value := range fetchedMapping {
+			newMap[strings.ToLower(key)] = value
+		}
+	} else {
+		newMap = fetchedMapping
+	}
+
 	redirectMap = newMap
 	logger.Infof("Updated redirect mapping, number of entries: %d", len(newMap))
 }
