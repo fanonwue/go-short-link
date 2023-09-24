@@ -111,7 +111,7 @@ func getServiceAccountPrivateKey() []byte {
 	}
 
 	if validateKeyContent {
-		logger.Debug("Key validation enabled, performing checks")
+		logger.Info("Key validation enabled, performing checks")
 		keyString := string(keyData)
 
 		keyPrefix := "-----BEGIN PRIVATE KEY-----"
@@ -124,7 +124,7 @@ func getServiceAccountPrivateKey() []byte {
 			logger.Panicf("Key does not end with expected suffix: %s", keySuffix)
 		}
 	} else {
-		logger.Debug("Key validation disabled, skipping checks")
+		logger.Info("Key validation disabled, skipping checks")
 	}
 
 	return keyData
@@ -144,7 +144,7 @@ func readPrivateKeyData(trimWhitespace bool) []byte {
 			keyFile = defaultKeyFilePath
 		}
 
-		logger.Debugf("Trying to read keyfile from path: %s", keyFile)
+		logger.Infof("Trying to read keyfile from path: %s", keyFile)
 		fileContent, err := os.ReadFile(keyFile)
 		if err != nil {
 			logger.Panicf("Error reading keyfile: %v", err)
