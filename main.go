@@ -311,7 +311,7 @@ func main() {
 	// Flush log buffer before exiting
 	defer logger.Sync()
 	logger.Infof("Starting HTTP server on port %d", appConfig.Port)
-	err := http.ListenAndServe(":"+strconv.FormatUint(uint64(appConfig.Port), 10), http.HandlerFunc(ServerHandler))
+	err := http.ListenAndServe(fmt.Sprintf(":%d", appConfig.Port), http.HandlerFunc(ServerHandler))
 	if err != nil {
 		return
 	}
