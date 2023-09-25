@@ -2,18 +2,20 @@ ARG WORKDIR=/opt/app
 
 FROM golang:1.21-alpine as builder
 ARG WORKDIR
+# Set Target to production for Makefile
+ENV TARGET prod
 WORKDIR $WORKDIR
 
 # make is needed for the Makefile
 RUN apk update && apk add --no-cache make
 
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
-COPY go.mod go.sum ./
-RUN go mod download && go mod verify
+COPY go.mod go.sum Makefile ./
+RUN make deps
 
 COPY . .
 # Run go build and strip symbols / debug info
-RUN make build TARGET=prod
+RUN make build
 
 FROM alpine
 ARG WORKDIR

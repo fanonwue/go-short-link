@@ -13,3 +13,6 @@ endif
 
 build:
 	go build -o bin/$(EXECUTABLE_NAME) --ldflags="$(LD_FLAGS)"
+
+deps:
+	go mod download && go mod verify
