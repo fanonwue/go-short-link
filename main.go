@@ -3,9 +3,9 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/cbroglie/mustache"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
+	"html/template"
 	"net/http"
 	"os"
 	"slices"
@@ -30,7 +30,7 @@ type (
 	}
 
 	// RedirectMap is a map of string keys and string values. The key is meant to be interpreted as the redirect path,
-	// which has been provided by the user, while the value represents the redirect target (as in, where the redirect)
+	// which has been provided by the user, while the value represents the redirect target (as in, where the redirect
 	// should lead to).
 	RedirectMap = map[string]string
 
@@ -60,7 +60,7 @@ var (
 		mapping: RedirectMap{},
 		hooks:   make([]RedirectMapHook, 0),
 	}
-	notFoundTemplate *mustache.Template
+	notFoundTemplate *template.Template
 )
 
 func (state *RedirectMapState) UpdateMapping(newMap RedirectMap) {
@@ -144,13 +144,13 @@ func Setup() {
 
 	addDefaultRedirectMapHooks()
 
-	notFoundTemplatePath := "./resources/not-found.mustache"
-	template, err := mustache.ParseFile(notFoundTemplatePath)
+	notFoundTemplatePath := "./resources/not-found.html"
+	t, err := template.ParseFiles(notFoundTemplatePath)
 	if err != nil {
 		logger.Panicf("Could not load not-found template file %s: %v", notFoundTemplatePath, err)
 	}
 
-	notFoundTemplate = template
+	notFoundTemplate = t
 
 	fileWebLink, err := SpreadsheetWebLink()
 	if err == nil {
@@ -217,7 +217,7 @@ func NotFoundHandler(w http.ResponseWriter, requestPath string) {
 	// Pre initialize to 2KiB, as the response will be bigger than 1KiB due to the size of the template
 	renderedBuf.Grow(2048)
 
-	err := notFoundTemplate.FRender(&renderedBuf, &NotFoundTemplateData{
+	err := notFoundTemplate.Execute(&renderedBuf, &NotFoundTemplateData{
 		RedirectName: requestPath,
 	})
 
@@ -273,6 +273,9 @@ func AddDefaultHeaders(h http.Header) {
 }
 
 func addDefaultRedirectMapHooks() {
+	// This helper function allows modification of a key using the supplied keyModifierFunc
+	// When the modified key differs from the original key, the modified key replaces the
+	// original key
 	modifyKey := func(redirectMap RedirectMap, key string, keyModifierFunc func(string) string) {
 		newKey := keyModifierFunc(key)
 		if key != newKey {

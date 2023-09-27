@@ -3,7 +3,6 @@ module github.com/fanonwue/go-short-link
 go 1.21.1
 
 require (
-	github.com/cbroglie/mustache v1.4.0
 	github.com/joho/godotenv v1.5.1
 	go.uber.org/zap v1.26.0
 	golang.org/x/oauth2 v0.12.0
