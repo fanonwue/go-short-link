@@ -175,10 +175,19 @@ func SetupLogging() {
 		logConfig.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
 		logConfig.OutputPaths = []string{"stdout"}
 	}
-	tmpLogger, _ := logConfig.Build()
+	baseLogger, _ := logConfig.Build()
 	// Make sure to flush logger to avoid mangled output
-	defer tmpLogger.Sync()
-	logger = tmpLogger.Sugar()
+	defer baseLogger.Sync()
+	logger = baseLogger.Sugar()
+
+	// Set zap's globals
+	zap.ReplaceGlobals(baseLogger)
+
+	// Set global logger as well
+	_, err := zap.RedirectStdLogAt(baseLogger, logConfig.Level.Level())
+	if err != nil {
+		logger.Errorf("Could not set global logger: %v", err)
+	}
 }
 
 func ServerHandler(w http.ResponseWriter, r *http.Request) {
