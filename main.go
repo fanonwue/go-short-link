@@ -42,6 +42,7 @@ type (
 		mapping RedirectMap
 		hooks   []RedirectMapHook
 		mutex   sync.RWMutex
+		channel chan RedirectMap
 	}
 )
 
@@ -61,6 +62,7 @@ var (
 		hooks:   make([]RedirectMapHook, 0),
 	}
 	notFoundTemplate *template.Template
+	quitUpdateJob    = make(chan bool)
 )
 
 func (state *RedirectMapState) UpdateMapping(newMap RedirectMap) {
@@ -87,6 +89,27 @@ func (state *RedirectMapState) Hooks() []RedirectMapHook {
 func (state *RedirectMapState) AddHook(hook RedirectMapHook) {
 	newHooks := append(state.hooks, hook)
 	state.hooks = newHooks
+}
+
+func (state *RedirectMapState) Channel() chan<- RedirectMap {
+	if state.channel == nil {
+		state.channel = make(chan RedirectMap)
+	}
+	return state.channel
+}
+
+func (state *RedirectMapState) ListenForUpdates() chan<- RedirectMap {
+	channel := state.Channel()
+	go state.updateListener()
+	return channel
+}
+
+func (state *RedirectMapState) updateListener() {
+	for {
+		mapping := <-state.channel
+		state.UpdateMapping(mapping)
+		logger.Infof("Updated redirect mapping, number of entries: %d", len(mapping))
+	}
 }
 
 func CreateAppConfig() *AppConfig {
@@ -157,8 +180,10 @@ func Setup() {
 		logger.Infof("Using document available at: %s", fileWebLink)
 	}
 
-	UpdateRedirectMapping(true)
-	go StartBackgroundUpdates()
+	targetChannel := redirectState.ListenForUpdates()
+
+	UpdateRedirectMapping(targetChannel, true)
+	go StartBackgroundUpdates(targetChannel, quitUpdateJob)
 }
 
 func SetupEnvironment() {
@@ -247,15 +272,22 @@ func NotFoundHandler(w http.ResponseWriter, requestPath string) {
 	}
 }
 
-func StartBackgroundUpdates() {
+func StartBackgroundUpdates(targetChannel chan<- RedirectMap, quitChannel <-chan bool) {
 	logger.Infof("Starting background updates at an interval of %d seconds", appConfig.UpdatePeriod)
 	for {
 		time.Sleep(time.Duration(appConfig.UpdatePeriod) * time.Second)
-		UpdateRedirectMapping(false)
+
+		select {
+		case <-quitChannel:
+			logger.Info("Received quit signal on update job")
+			return
+		default:
+			UpdateRedirectMapping(targetChannel, false)
+		}
 	}
 }
 
-func UpdateRedirectMapping(force bool) {
+func UpdateRedirectMapping(target chan<- RedirectMap, force bool) {
 	if !force && !NeedsUpdate() {
 		logger.Debugf("File has not changed since last update, skipping update")
 		return
@@ -269,9 +301,7 @@ func UpdateRedirectMapping(force bool) {
 		newMap = hook(newMap)
 	}
 
-	redirectState.UpdateMapping(newMap)
-
-	logger.Infof("Updated redirect mapping, number of entries: %d", len(newMap))
+	target <- newMap
 }
 
 func AddDefaultHeaders(h http.Header) {
