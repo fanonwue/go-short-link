@@ -105,8 +105,7 @@ func (state *RedirectMapState) ListenForUpdates() chan<- RedirectMap {
 }
 
 func (state *RedirectMapState) updateListener() {
-	for {
-		mapping := <-state.channel
+	for mapping := range state.channel {
 		state.UpdateMapping(mapping)
 		logger.Infof("Updated redirect mapping, number of entries: %d", len(mapping))
 	}
