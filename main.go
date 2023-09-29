@@ -11,7 +11,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -37,13 +36,6 @@ type (
 	// RedirectMapHook A function that takes a RedirectMap, processes it and returns a new RedirectMap with
 	// the processed result.
 	RedirectMapHook = func(RedirectMap) RedirectMap
-
-	RedirectMapState struct {
-		mapping RedirectMap
-		hooks   []RedirectMapHook
-		mutex   sync.RWMutex
-		channel chan RedirectMap
-	}
 )
 
 const (
@@ -54,62 +46,16 @@ const (
 )
 
 var (
-	appConfig     *AppConfig
-	isProd        bool
-	logger        *zap.SugaredLogger
-	redirectState = RedirectMapState{
+	appConfig        *AppConfig
+	isProd           bool
+	logger           *zap.SugaredLogger
+	notFoundTemplate *template.Template
+	quitUpdateJob    = make(chan bool)
+	redirectState    = RedirectMapState{
 		mapping: RedirectMap{},
 		hooks:   make([]RedirectMapHook, 0),
 	}
-	notFoundTemplate *template.Template
-	quitUpdateJob    = make(chan bool)
 )
-
-func (state *RedirectMapState) UpdateMapping(newMap RedirectMap) {
-	// Synchronize using a mutex to prevent race conditions
-	state.mutex.Lock()
-	// Defer unlock to make sure it always happens, regardless of panics etc.
-	defer state.mutex.Unlock()
-	state.mapping = newMap
-}
-
-func (state *RedirectMapState) GetTarget(key string) (string, bool) {
-	// Synchronize using a mutex to prevent race conditions
-	state.mutex.RLock()
-	// Defer unlock to make sure it always happens, regardless of panics etc.
-	defer state.mutex.RUnlock()
-	target, ok := state.mapping[key]
-	return target, ok
-}
-
-func (state *RedirectMapState) Hooks() []RedirectMapHook {
-	return state.hooks
-}
-
-func (state *RedirectMapState) AddHook(hook RedirectMapHook) {
-	newHooks := append(state.hooks, hook)
-	state.hooks = newHooks
-}
-
-func (state *RedirectMapState) Channel() chan<- RedirectMap {
-	if state.channel == nil {
-		state.channel = make(chan RedirectMap)
-	}
-	return state.channel
-}
-
-func (state *RedirectMapState) ListenForUpdates() chan<- RedirectMap {
-	channel := state.Channel()
-	go state.updateListener()
-	return channel
-}
-
-func (state *RedirectMapState) updateListener() {
-	for mapping := range state.channel {
-		state.UpdateMapping(mapping)
-		logger.Infof("Updated redirect mapping, number of entries: %d", len(mapping))
-	}
-}
 
 func CreateAppConfig() *AppConfig {
 	ignoreCaseInPath, err := strconv.ParseBool(os.Getenv("IGNORE_CASE_IN_PATH"))
