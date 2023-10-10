@@ -1,7 +1,4 @@
-<!-- cache-not-found -->
-<!DOCTYPE html>
-<html lang="en">
-<head>
+{{define "sharedHead"}}
     <meta charset="UTF-8">
     <style>
         :root {
@@ -37,11 +34,15 @@
         }
     </style>
     <link rel="icon" href="data:;base64,=">
-    <title>Not Found - No redirect available</title>
+{{end}}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {{template "sharedHead"}}
+    <title>{{template "title" .}}</title>
 </head>
 <body>
-<p>404 Not Found - No redirection target available for</p>
-<p class="bold" id="link">{{.RedirectName}}</p>
-<p>Looks like someone may have sent you the wrong link, or you mistyped somewhere!</p>
+{{template "body" .}}
 </body>
 </html>

@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"net/http"
 	"os"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -28,6 +29,11 @@ type (
 		RedirectName string
 	}
 
+	RedirectInfoTemplateData struct {
+		RedirectName string
+		Target       string
+	}
+
 	// RedirectMap is a map of string keys and string values. The key is meant to be interpreted as the redirect path,
 	// which has been provided by the user, while the value represents the redirect target (as in, where the redirect
 	// should lead to).
@@ -43,15 +49,18 @@ const (
 	cacheControlHeaderTemplate = "public, max-age=%d"
 	defaultUpdatePeriod        = 300
 	minimumUpdatePeriod        = 15
+	infoRequestIdentifier      = "+"
+	baseTemplateName           = "base.gohtml"
 )
 
 var (
-	appConfig        *AppConfig
-	isProd           bool
-	logger           *zap.SugaredLogger
-	notFoundTemplate *template.Template
-	quitUpdateJob    = make(chan bool)
-	redirectState    = RedirectMapState{
+	appConfig            *AppConfig
+	isProd               bool
+	logger               *zap.SugaredLogger
+	notFoundTemplate     *template.Template
+	redirectInfoTemplate *template.Template
+	quitUpdateJob        = make(chan bool)
+	redirectState        = RedirectMapState{
 		mapping: RedirectMap{},
 		hooks:   make([]RedirectMapHook, 0),
 	}
@@ -110,15 +119,20 @@ func Setup() {
 	CreateAppConfig()
 	CreateSheetsConfig()
 
-	addDefaultRedirectMapHooks()
+	var err error
+	resourcePath := "./resources"
+	baseTemplatePath := path.Join(resourcePath, baseTemplateName)
+	notFoundTemplatePath := path.Join(resourcePath, "not-found.gohtml")
+	redirectInfoTemplatePath := path.Join(resourcePath, "redirect-info.gohtml")
 
-	notFoundTemplatePath := "./resources/not-found.html"
-	t, err := template.ParseFiles(notFoundTemplatePath)
+	notFoundTemplate = template.Must(template.ParseFiles(notFoundTemplatePath, baseTemplatePath))
+
+	redirectInfoTemplate, err = template.ParseFiles(redirectInfoTemplatePath, baseTemplatePath)
 	if err != nil {
-		logger.Panicf("Could not load not-found template file %s: %v", notFoundTemplatePath, err)
+		logger.Warnf("Could not load redirect-info template file %s: %v", redirectInfoTemplatePath, err)
 	}
 
-	notFoundTemplate = t
+	addDefaultRedirectMapHooks()
 
 	fileWebLink, err := SpreadsheetWebLink()
 	if err == nil {
@@ -162,9 +176,11 @@ func SetupLogging() {
 
 func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	responseHeader := w.Header()
-	redirectTarget, ok := RedirectTargetForRequest(r)
-	if !ok {
+	redirectTarget, found, infoRequest := RedirectTargetForRequest(r)
+	if !found {
 		NotFoundHandler(w, r.URL.Path)
+	} else if infoRequest {
+		RedirectInfoHandler(w, r.URL.Path, redirectTarget)
 	} else {
 		responseHeader["Content-Type"] = nil
 		AddDefaultHeaders(responseHeader)
@@ -172,23 +188,60 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func RedirectTargetForRequest(r *http.Request) (string, bool) {
-	normalizedPath := normalizeRedirectPath(r.URL.Path)
+func RedirectTargetForRequest(r *http.Request) (string, bool, bool) {
+	normalizedPath, infoRequest := normalizeRedirectPath(r.URL.Path)
 
 	// Try to find target by hostname if Path is empty
 	if len(normalizedPath) == 0 {
-		normalizedPath = normalizeRedirectPath(r.Host)
+		normalizedPath, _ = normalizeRedirectPath(r.Host)
 	}
 
-	return redirectState.GetTarget(normalizedPath)
+	target, found := redirectState.GetTarget(normalizedPath)
+
+	// Ignore infoRequest if there isn't a template loaded for it
+	if redirectInfoTemplate == nil {
+		infoRequest = false
+	}
+
+	return target, found, infoRequest
 }
 
-func normalizeRedirectPath(path string) string {
+func normalizeRedirectPath(path string) (string, bool) {
 	path = strings.Trim(path, "/")
 	if appConfig.IgnoreCaseInPath {
 		path = strings.ToLower(path)
 	}
-	return path
+	infoRequest := strings.HasSuffix(path, infoRequestIdentifier)
+	if infoRequest {
+		path = strings.Trim(path, infoRequestIdentifier)
+	}
+	return path, infoRequest
+}
+
+func normalizeRedirectPathKeepLeadingSlash(path string) (string, bool) {
+	normalizedPath, infoRequest := normalizeRedirectPath(path)
+	if strings.HasPrefix(path, "/") {
+		normalizedPath = "/" + normalizedPath
+	}
+	return normalizedPath, infoRequest
+}
+
+func RedirectInfoHandler(w http.ResponseWriter, requestPath string, target string) {
+	var renderedBuf bytes.Buffer
+	renderedBuf.Grow(2048)
+
+	requestPath, _ = normalizeRedirectPathKeepLeadingSlash(requestPath)
+
+	err := redirectInfoTemplate.ExecuteTemplate(&renderedBuf, baseTemplateName, &RedirectInfoTemplateData{
+		RedirectName: requestPath,
+		Target:       target,
+	})
+
+	if err != nil {
+		logger.Errorf("Could not render redirect-info template: %v", err)
+	}
+
+	htmlResponse(w, http.StatusOK, &renderedBuf)
 }
 
 func NotFoundHandler(w http.ResponseWriter, requestPath string) {
@@ -196,7 +249,9 @@ func NotFoundHandler(w http.ResponseWriter, requestPath string) {
 	// Pre initialize to 2KiB, as the response will be bigger than 1KiB due to the size of the template
 	renderedBuf.Grow(2048)
 
-	err := notFoundTemplate.Execute(&renderedBuf, &NotFoundTemplateData{
+	requestPath, _ = normalizeRedirectPathKeepLeadingSlash(requestPath)
+
+	err := notFoundTemplate.ExecuteTemplate(&renderedBuf, baseTemplateName, &NotFoundTemplateData{
 		RedirectName: requestPath,
 	})
 
@@ -204,14 +259,18 @@ func NotFoundHandler(w http.ResponseWriter, requestPath string) {
 		logger.Errorf("Could not render not-found template: %v", err)
 	}
 
+	htmlResponse(w, http.StatusNotFound, &renderedBuf)
+}
+
+func htmlResponse(w http.ResponseWriter, status int, buffer *bytes.Buffer) {
 	responseHeader := w.Header()
 
 	responseHeader.Set("Content-Type", "text/html; charset=utf-8")
-	responseHeader.Set("Content-Length", strconv.Itoa(renderedBuf.Len()))
+	responseHeader.Set("Content-Length", strconv.Itoa(buffer.Len()))
 	AddDefaultHeaders(responseHeader)
-	w.WriteHeader(http.StatusNotFound)
+	w.WriteHeader(status)
 
-	_, err = renderedBuf.WriteTo(w)
+	_, err := buffer.WriteTo(w)
 	if err != nil {
 		logger.Errorf("Could not write response body: %v", err)
 	}
@@ -278,6 +337,19 @@ func addDefaultRedirectMapHooks() {
 		}
 		return originalMap
 	})
+
+	if redirectInfoTemplate != nil {
+		logger.Debug("Adding update hook to remove info-request suffix from redirect paths")
+		redirectState.AddHook(func(originalMap RedirectMap) RedirectMap {
+			// Edit map in place
+			for key := range originalMap {
+				modifyKey(originalMap, key, func(s string) string {
+					return strings.TrimRight(s, infoRequestIdentifier)
+				})
+			}
+			return originalMap
+		})
+	}
 
 	if appConfig.IgnoreCaseInPath {
 		logger.Debug("Adding update hook to make redirect paths lowercase")
