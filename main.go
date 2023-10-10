@@ -179,7 +179,7 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	redirectTarget, found, infoRequest := RedirectTargetForRequest(r)
 	if !found {
 		NotFoundHandler(w, r.URL.Path)
-	} else if infoRequest {
+	} else if infoRequest && redirectInfoEndpointEnabled() {
 		RedirectInfoHandler(w, r.URL.Path, redirectTarget)
 	} else {
 		responseHeader["Content-Type"] = nil
@@ -315,6 +315,10 @@ func AddDefaultHeaders(h http.Header) {
 	}
 }
 
+func redirectInfoEndpointEnabled() bool {
+	return redirectInfoTemplate != nil
+}
+
 func addDefaultRedirectMapHooks() {
 	// This helper function allows modification of a key using the supplied keyModifierFunc
 	// When the modified key differs from the original key, the modified key replaces the
@@ -338,7 +342,7 @@ func addDefaultRedirectMapHooks() {
 		return originalMap
 	})
 
-	if redirectInfoTemplate != nil {
+	if redirectInfoEndpointEnabled() {
 		logger.Debug("Adding update hook to remove info-request suffix from redirect paths")
 		redirectState.AddHook(func(originalMap RedirectMap) RedirectMap {
 			// Edit map in place
