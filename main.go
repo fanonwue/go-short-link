@@ -50,7 +50,6 @@ const (
 	defaultUpdatePeriod        = 300
 	minimumUpdatePeriod        = 15
 	infoRequestIdentifier      = "+"
-	baseTemplateName           = "base.gohtml"
 )
 
 var (
@@ -121,13 +120,13 @@ func Setup() {
 
 	var err error
 	resourcePath := "./resources"
-	baseTemplatePath := path.Join(resourcePath, baseTemplateName)
+	baseTemplatePath := path.Join(resourcePath, "base.gohtml")
 	notFoundTemplatePath := path.Join(resourcePath, "not-found.gohtml")
 	redirectInfoTemplatePath := path.Join(resourcePath, "redirect-info.gohtml")
 
-	notFoundTemplate = template.Must(template.ParseFiles(notFoundTemplatePath, baseTemplatePath))
+	notFoundTemplate = template.Must(template.ParseFiles(baseTemplatePath, notFoundTemplatePath))
 
-	redirectInfoTemplate, err = template.ParseFiles(redirectInfoTemplatePath, baseTemplatePath)
+	redirectInfoTemplate, err = template.ParseFiles(baseTemplatePath, redirectInfoTemplatePath)
 	if err != nil {
 		logger.Warnf("Could not load redirect-info template file %s: %v", redirectInfoTemplatePath, err)
 	}
@@ -232,7 +231,7 @@ func RedirectInfoHandler(w http.ResponseWriter, requestPath string, target strin
 
 	requestPath, _ = normalizeRedirectPathKeepLeadingSlash(requestPath)
 
-	err := redirectInfoTemplate.ExecuteTemplate(&renderedBuf, baseTemplateName, &RedirectInfoTemplateData{
+	err := redirectInfoTemplate.Execute(&renderedBuf, &RedirectInfoTemplateData{
 		RedirectName: requestPath,
 		Target:       target,
 	})
@@ -251,7 +250,7 @@ func NotFoundHandler(w http.ResponseWriter, requestPath string) {
 
 	requestPath, _ = normalizeRedirectPathKeepLeadingSlash(requestPath)
 
-	err := notFoundTemplate.ExecuteTemplate(&renderedBuf, baseTemplateName, &NotFoundTemplateData{
+	err := notFoundTemplate.Execute(&renderedBuf, &NotFoundTemplateData{
 		RedirectName: requestPath,
 	})
 
