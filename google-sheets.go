@@ -199,7 +199,7 @@ func NeedsUpdate() bool {
 	return modifiedTime.After(*config.LastUpdate)
 }
 
-func FetchRedirectMapping() RedirectMap {
+func FetchRedirectMapping() (RedirectMap, error) {
 	service := config.SheetsService()
 
 	sheetsRange := "A2:B"
@@ -213,13 +213,13 @@ func FetchRedirectMapping() RedirectMap {
 	result, err := service.Spreadsheets.Values.Get(config.SpreadsheetId, sheetsRange).Do()
 	if err != nil {
 		logger.Errorf("Unable to retrieve data from sheet: %v", err)
-		return mapping
+		return nil, err
 	}
 
 	config.LastUpdate = &updateTime
 
 	if len(result.Values) == 0 {
-		return mapping
+		return mapping, nil
 	}
 
 	for _, row := range result.Values {
@@ -250,5 +250,5 @@ func FetchRedirectMapping() RedirectMap {
 		mapping[key] = value
 	}
 
-	return mapping
+	return mapping, nil
 }

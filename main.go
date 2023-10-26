@@ -296,7 +296,11 @@ func UpdateRedirectMapping(target chan<- RedirectMap, force bool) {
 		return
 	}
 
-	fetchedMapping := FetchRedirectMapping()
+	fetchedMapping, err := FetchRedirectMapping()
+	if err != nil {
+		logger.Warnf("Did not update redirect mapping due to an error")
+		return
+	}
 
 	var newMap = fetchedMapping
 
