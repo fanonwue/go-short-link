@@ -28,6 +28,19 @@ func (state *RedirectMapState) GetTarget(key string) (string, bool) {
 	return target, ok
 }
 
+// CurrentMapping creates a copy of the current mapping and returns the copied map.
+func (state *RedirectMapState) CurrentMapping() RedirectMap {
+	state.mutex.RLock()
+	defer state.mutex.RUnlock()
+	targetMap := make(RedirectMap, len(state.mapping))
+
+	for key, value := range state.mapping {
+		targetMap[key] = value
+	}
+
+	return targetMap
+}
+
 func (state *RedirectMapState) Hooks() []RedirectMapHook {
 	return state.hooks
 }

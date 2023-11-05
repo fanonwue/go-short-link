@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
@@ -23,6 +24,7 @@ type (
 		UpdatePeriod       uint32
 		HttpCacheMaxAge    uint32
 		CacheControlHeader string
+		Healthcheck        bool
 	}
 
 	NotFoundTemplateData struct {
@@ -32,6 +34,12 @@ type (
 	RedirectInfoTemplateData struct {
 		RedirectName string
 		Target       string
+	}
+
+	HealthcheckData struct {
+		MappingSize int         `json:"mappingSize"`
+		Mapping     RedirectMap `json:"mapping"`
+		Running     bool        `json:"running"`
 	}
 
 	// RedirectMap is a map of string keys and string values. The key is meant to be interpreted as the redirect path,
@@ -50,6 +58,7 @@ const (
 	defaultUpdatePeriod        = 300
 	minimumUpdatePeriod        = 15
 	infoRequestIdentifier      = "+"
+	healthcheckEndpoint        = "/_status/health"
 )
 
 var (
@@ -97,6 +106,11 @@ func CreateAppConfig() *AppConfig {
 		httpCacheMaxAge = updatePeriod * 2
 	}
 
+	disableHealthcheck, err := strconv.ParseBool(os.Getenv("DISABLE_HEALTHCHECK"))
+	if err != nil {
+		disableHealthcheck = false
+	}
+
 	appConfig = &AppConfig{
 		IgnoreCaseInPath:   ignoreCaseInPath,
 		ShowServerHeader:   showServerHeader,
@@ -104,6 +118,7 @@ func CreateAppConfig() *AppConfig {
 		UpdatePeriod:       uint32(updatePeriod),
 		HttpCacheMaxAge:    uint32(httpCacheMaxAge),
 		CacheControlHeader: fmt.Sprintf(cacheControlHeaderTemplate, httpCacheMaxAge),
+		Healthcheck:        !disableHealthcheck,
 	}
 
 	return appConfig
@@ -175,6 +190,12 @@ func SetupLogging() {
 
 func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	responseHeader := w.Header()
+
+	if appConfig.Healthcheck && strings.TrimRight(r.URL.Path, "/") == healthcheckEndpoint {
+		HealthcheckHandler(w)
+		return
+	}
+
 	redirectTarget, found, infoRequest := RedirectTargetForRequest(r)
 	if !found {
 		NotFoundHandler(w, r.URL.Path)
@@ -182,8 +203,37 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 		RedirectInfoHandler(w, r.URL.Path, redirectTarget)
 	} else {
 		responseHeader["Content-Type"] = nil
-		AddDefaultHeaders(responseHeader)
+		AddDefaultHeadersWithCache(responseHeader)
 		http.Redirect(w, r, redirectTarget, http.StatusTemporaryRedirect)
+	}
+}
+
+func HealthcheckHandler(w http.ResponseWriter) {
+	var buf bytes.Buffer
+
+	currentMapping := redirectState.CurrentMapping()
+	healthcheckData := HealthcheckData{
+		MappingSize: len(currentMapping),
+		Mapping:     currentMapping,
+		Running:     true,
+	}
+
+	h := w.Header()
+	AddDefaultHeaders(h)
+	h.Set("Content-Type", "application/json")
+
+	err := json.NewEncoder(&buf).Encode(healthcheckData)
+	if err != nil {
+		logger.Warnf("Error writing healtchcheck data to buffer: %v", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	h.Set("Content-Length", strconv.Itoa(buf.Len()))
+
+	_, err = buf.WriteTo(w)
+	if err != nil {
+		logger.Warnf("Error writing healtchcheck data to response body: %v", err)
 	}
 }
 
@@ -266,7 +316,7 @@ func htmlResponse(w http.ResponseWriter, status int, buffer *bytes.Buffer) {
 
 	responseHeader.Set("Content-Type", "text/html; charset=utf-8")
 	responseHeader.Set("Content-Length", strconv.Itoa(buffer.Len()))
-	AddDefaultHeaders(responseHeader)
+	AddDefaultHeadersWithCache(responseHeader)
 	w.WriteHeader(status)
 
 	_, err := buffer.WriteTo(w)
@@ -312,10 +362,14 @@ func UpdateRedirectMapping(target chan<- RedirectMap, force bool) {
 }
 
 func AddDefaultHeaders(h http.Header) {
-	h.Set("Cache-Control", appConfig.CacheControlHeader)
 	if appConfig.ShowServerHeader {
 		h.Set("Server", serverIdentifierHeader)
 	}
+}
+
+func AddDefaultHeadersWithCache(h http.Header) {
+	AddDefaultHeaders(h)
+	h.Set("Cache-Control", appConfig.CacheControlHeader)
 }
 
 func redirectInfoEndpointEnabled() bool {
