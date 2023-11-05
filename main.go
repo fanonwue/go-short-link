@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"github.com/joho/godotenv"
@@ -17,14 +19,20 @@ import (
 )
 
 type (
+	AdminCredentials struct {
+		UserHash []byte
+		PassHash []byte
+	}
+
 	AppConfig struct {
-		IgnoreCaseInPath   bool
-		ShowServerHeader   bool
-		Port               uint16
-		UpdatePeriod       uint32
-		HttpCacheMaxAge    uint32
-		CacheControlHeader string
-		Healthcheck        bool
+		IgnoreCaseInPath      bool
+		ShowServerHeader      bool
+		Port                  uint16
+		UpdatePeriod          uint32
+		HttpCacheMaxAge       uint32
+		CacheControlHeader    string
+		StatusEndpointEnabled bool
+		AdminCredentials      *AdminCredentials
 	}
 
 	NotFoundTemplateData struct {
@@ -36,10 +44,15 @@ type (
 		Target       string
 	}
 
-	HealthcheckData struct {
-		MappingSize int         `json:"mappingSize"`
-		Mapping     RedirectMap `json:"mapping"`
-		Running     bool        `json:"running"`
+	StatusHealthcheck struct {
+		MappingSize int  `json:"mappingSize"`
+		Running     bool `json:"running"`
+	}
+
+	StatusInfo struct {
+		Mapping       RedirectMap `json:"mapping"`
+		SpreadsheetId string      `json:"spreadsheetId"`
+		LastUpdate    *time.Time  `json:"lastUpdate"`
 	}
 
 	// RedirectMap is a map of string keys and string values. The key is meant to be interpreted as the redirect path,
@@ -58,7 +71,7 @@ const (
 	defaultUpdatePeriod        = 300
 	minimumUpdatePeriod        = 15
 	infoRequestIdentifier      = "+"
-	healthcheckEndpoint        = "/_status/health"
+	statusEndpoint             = "/_status/"
 )
 
 var (
@@ -106,22 +119,40 @@ func CreateAppConfig() *AppConfig {
 		httpCacheMaxAge = updatePeriod * 2
 	}
 
-	disableHealthcheck, err := strconv.ParseBool(os.Getenv("DISABLE_HEALTHCHECK"))
+	disableStatus, err := strconv.ParseBool(os.Getenv("DISABLE_STATUS"))
 	if err != nil {
-		disableHealthcheck = false
+		disableStatus = false
 	}
 
 	appConfig = &AppConfig{
-		IgnoreCaseInPath:   ignoreCaseInPath,
-		ShowServerHeader:   showServerHeader,
-		Port:               uint16(port),
-		UpdatePeriod:       uint32(updatePeriod),
-		HttpCacheMaxAge:    uint32(httpCacheMaxAge),
-		CacheControlHeader: fmt.Sprintf(cacheControlHeaderTemplate, httpCacheMaxAge),
-		Healthcheck:        !disableHealthcheck,
+		IgnoreCaseInPath:      ignoreCaseInPath,
+		ShowServerHeader:      showServerHeader,
+		Port:                  uint16(port),
+		UpdatePeriod:          uint32(updatePeriod),
+		HttpCacheMaxAge:       uint32(httpCacheMaxAge),
+		CacheControlHeader:    fmt.Sprintf(cacheControlHeaderTemplate, httpCacheMaxAge),
+		StatusEndpointEnabled: !disableStatus,
+		AdminCredentials:      createAdminCredentials(),
 	}
 
 	return appConfig
+}
+
+func createAdminCredentials() *AdminCredentials {
+	user := os.Getenv("ADMIN_USER")
+	pass := os.Getenv("ADMIN_PASS")
+
+	if len(user) == 0 || len(pass) == 0 {
+		return nil
+	}
+
+	userHash := sha256.Sum256([]byte(user))
+	passHash := sha256.Sum256([]byte(pass))
+
+	return &AdminCredentials{
+		UserHash: userHash[:],
+		PassHash: passHash[:],
+	}
 }
 
 func Setup() {
@@ -191,8 +222,8 @@ func SetupLogging() {
 func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	responseHeader := w.Header()
 
-	if appConfig.Healthcheck && strings.TrimRight(r.URL.Path, "/") == healthcheckEndpoint {
-		HealthcheckHandler(w)
+	if appConfig.StatusEndpointEnabled && strings.HasPrefix(strings.TrimRight(r.URL.Path, "/"), statusEndpoint) {
+		StatusEndpointHandler(w, r)
 		return
 	}
 
@@ -208,24 +239,47 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func HealthcheckHandler(w http.ResponseWriter) {
+func StatusEndpointHandler(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
 
-	currentMapping := redirectState.CurrentMapping()
-	healthcheckData := HealthcheckData{
-		MappingSize: len(currentMapping),
-		Mapping:     currentMapping,
-		Running:     true,
-	}
+	pathParts := strings.Split(r.URL.Path, "/")
+	endpoint := pathParts[len(pathParts)-1]
 
 	h := w.Header()
 	AddDefaultHeaders(h)
-	h.Set("Content-Type", "application/json")
 
-	err := json.NewEncoder(&buf).Encode(healthcheckData)
+	var body any
+
+	switch endpoint {
+	case "health":
+		body = StatusHealthcheck{
+			MappingSize: redirectState.MappingSize(),
+			Running:     true,
+		}
+		break
+	case "info":
+		if !checkBasicAuth(w, r) {
+			return
+		}
+		body = StatusInfo{
+			Mapping:       redirectState.CurrentMapping(),
+			SpreadsheetId: config.SpreadsheetId,
+			LastUpdate:    config.LastUpdate,
+		}
+		break
+	}
+
+	if body != nil {
+		h.Set("Content-Type", "application/json")
+	} else {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	err := json.NewEncoder(&buf).Encode(body)
 	if err != nil {
-		logger.Warnf("Error writing healtchcheck data to buffer: %v", err)
-		w.WriteHeader(500)
+		logger.Errorf("Error writing status data to buffer: %v", err)
+		http.Error(w, "Unknown Error", http.StatusInternalServerError)
 		return
 	}
 
@@ -233,7 +287,37 @@ func HealthcheckHandler(w http.ResponseWriter) {
 
 	_, err = buf.WriteTo(w)
 	if err != nil {
-		logger.Warnf("Error writing healtchcheck data to response body: %v", err)
+		logger.Errorf("Error writing status data to response body: %v", err)
+	}
+}
+
+func checkBasicAuth(w http.ResponseWriter, r *http.Request) bool {
+	creds := appConfig.AdminCredentials
+	if creds == nil {
+		return true
+	}
+
+	onUnauthorized := func() bool {
+		w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return false
+	}
+
+	user, pass, ok := r.BasicAuth()
+	if !ok {
+		return onUnauthorized()
+	}
+
+	userHash := sha256.Sum256([]byte(user))
+	passHash := sha256.Sum256([]byte(pass))
+
+	userMatched := subtle.ConstantTimeCompare(creds.UserHash, userHash[:]) == 1
+	passMatched := subtle.ConstantTimeCompare(creds.PassHash, passHash[:]) == 1
+
+	if userMatched && passMatched {
+		return true
+	} else {
+		return onUnauthorized()
 	}
 }
 

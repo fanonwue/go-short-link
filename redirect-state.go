@@ -41,6 +41,12 @@ func (state *RedirectMapState) CurrentMapping() RedirectMap {
 	return targetMap
 }
 
+func (state *RedirectMapState) MappingSize() int {
+	state.mutex.RLock()
+	defer state.mutex.RUnlock()
+	return len(state.mapping)
+}
+
 func (state *RedirectMapState) Hooks() []RedirectMapHook {
 	return state.hooks
 }
