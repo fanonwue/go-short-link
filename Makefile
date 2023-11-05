@@ -16,3 +16,6 @@ build:
 
 deps:
 	go mod download && go mod verify
+
+deps-update:
+	go get -u && go mod tidy
