@@ -74,4 +74,8 @@ func (state *RedirectMapState) updateListener() {
 		state.UpdateMapping(mapping)
 		logger.Infof("Updated redirect mapping, number of entries: %d", len(mapping))
 	}
+
+	// The channel has been closed at this point, so we need to reflect that in our local state
+	logger.Debugf("Setting redirect state channel to nil")
+	state.channel = nil
 }
