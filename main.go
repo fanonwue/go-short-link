@@ -220,7 +220,10 @@ func SetupLogging() {
 }
 
 func ServerHandler(w http.ResponseWriter, r *http.Request) {
-	responseHeader := w.Header()
+	if r.Method != "GET" {
+		http.Error(w, "Unsupported Method", http.StatusMethodNotAllowed)
+		return
+	}
 
 	if appConfig.StatusEndpointEnabled && strings.HasPrefix(strings.TrimRight(r.URL.Path, "/"), statusEndpoint) {
 		StatusEndpointHandler(w, r)
@@ -233,6 +236,7 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	} else if infoRequest && redirectInfoEndpointEnabled() {
 		RedirectInfoHandler(w, r.URL.Path, redirectTarget)
 	} else {
+		responseHeader := w.Header()
 		responseHeader["Content-Type"] = nil
 		AddDefaultHeadersWithCache(responseHeader)
 		http.Redirect(w, r, redirectTarget, http.StatusTemporaryRedirect)
