@@ -92,16 +92,6 @@ var (
 )
 
 func CreateAppConfig() *AppConfig {
-	ignoreCaseInPath, err := strconv.ParseBool(os.Getenv("IGNORE_CASE_IN_PATH"))
-	if err != nil {
-		ignoreCaseInPath = true
-	}
-
-	showServerHeader, err := strconv.ParseBool(os.Getenv("SHOW_SERVER_HEADER"))
-	if err != nil {
-		showServerHeader = true
-	}
-
 	port, err := strconv.ParseUint(os.Getenv("APP_PORT"), 0, 16)
 	if err != nil {
 		port = 3000
@@ -123,35 +113,28 @@ func CreateAppConfig() *AppConfig {
 		httpCacheMaxAge = updatePeriod * 2
 	}
 
-	disableStatus, err := strconv.ParseBool(os.Getenv("DISABLE_STATUS"))
-	if err != nil {
-		disableStatus = false
-	}
-
-	useETag, err := strconv.ParseBool(os.Getenv("ENABLE_ETAG"))
-	if err != nil {
-		useETag = true
-	}
-
-	useRedirectBody, err := strconv.ParseBool(os.Getenv("ENABLE_REDIRECT_BODY"))
-	if err != nil {
-		useRedirectBody = false
-	}
-
 	appConfig = &AppConfig{
-		IgnoreCaseInPath:      ignoreCaseInPath,
-		ShowServerHeader:      showServerHeader,
+		IgnoreCaseInPath:      boolConfig("IGNORE_CASE_IN_PATH", true),
+		ShowServerHeader:      boolConfig("SHOW_SERVER_HEADER", true),
 		Port:                  uint16(port),
 		UpdatePeriod:          uint32(updatePeriod),
 		HttpCacheMaxAge:       uint32(httpCacheMaxAge),
 		CacheControlHeader:    fmt.Sprintf(cacheControlHeaderTemplate, httpCacheMaxAge),
-		StatusEndpointEnabled: !disableStatus,
+		StatusEndpointEnabled: !boolConfig("DISABLE_STATUS", false),
 		AdminCredentials:      createAdminCredentials(),
-		UseETag:               useETag,
-		UseRedirectBody:       useRedirectBody,
+		UseETag:               boolConfig("ENABLE_ETAG", true),
+		UseRedirectBody:       boolConfig("ENABLE_REDIRECT_BODY", true),
 	}
 
 	return appConfig
+}
+
+func boolConfig(key string, defaultValue bool) bool {
+	value, err := strconv.ParseBool(os.Getenv(key))
+	if err != nil {
+		value = defaultValue
+	}
+	return value
 }
 
 func createAdminCredentials() *AdminCredentials {
