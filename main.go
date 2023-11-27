@@ -34,6 +34,7 @@ type (
 		CacheControlHeader    string
 		StatusEndpointEnabled bool
 		UseETag               bool
+		UseRedirectBody       bool
 		AdminCredentials      *AdminCredentials
 	}
 
@@ -132,6 +133,11 @@ func CreateAppConfig() *AppConfig {
 		useETag = true
 	}
 
+	useRedirectBody, err := strconv.ParseBool(os.Getenv("ENABLE_REDIRECT_BODY"))
+	if err != nil {
+		useRedirectBody = false
+	}
+
 	appConfig = &AppConfig{
 		IgnoreCaseInPath:      ignoreCaseInPath,
 		ShowServerHeader:      showServerHeader,
@@ -142,6 +148,7 @@ func CreateAppConfig() *AppConfig {
 		StatusEndpointEnabled: !disableStatus,
 		AdminCredentials:      createAdminCredentials(),
 		UseETag:               useETag,
+		UseRedirectBody:       useRedirectBody,
 	}
 
 	return appConfig
@@ -247,10 +254,13 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		responseHeader := w.Header()
 		AddDefaultHeadersWithCache(responseHeader)
-		responseHeader["Content-Type"] = nil
 
 		if appConfig.UseETag {
 			responseHeader.Set("ETag", etagFromData(redirectTarget))
+		}
+
+		if !appConfig.UseRedirectBody {
+			responseHeader["Content-Type"] = nil
 		}
 
 		http.Redirect(w, r, redirectTarget, http.StatusTemporaryRedirect)
