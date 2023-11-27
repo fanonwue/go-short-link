@@ -371,7 +371,7 @@ func normalizeRedirectPathKeepLeadingSlash(path string) (string, bool) {
 }
 
 func RedirectInfoHandler(w http.ResponseWriter, requestPath string, target string) {
-	var renderedBuf *bytes.Buffer
+	renderedBuf := new(bytes.Buffer)
 	renderedBuf.Grow(2048)
 
 	requestPath, _ = normalizeRedirectPathKeepLeadingSlash(requestPath)
@@ -391,7 +391,7 @@ func RedirectInfoHandler(w http.ResponseWriter, requestPath string, target strin
 }
 
 func NotFoundHandler(w http.ResponseWriter, requestPath string) {
-	var renderedBuf *bytes.Buffer
+	renderedBuf := new(bytes.Buffer)
 	// Pre initialize to 2KiB, as the response will be bigger than 1KiB due to the size of the template
 	renderedBuf.Grow(2048)
 
