@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/joho/godotenv"
@@ -32,6 +33,7 @@ type (
 		HttpCacheMaxAge       uint32
 		CacheControlHeader    string
 		StatusEndpointEnabled bool
+		UseETag               bool
 		AdminCredentials      *AdminCredentials
 	}
 
@@ -72,6 +74,7 @@ const (
 	minimumUpdatePeriod        = 15
 	infoRequestIdentifier      = "+"
 	statusEndpoint             = "/_status/"
+	etagLength                 = 8
 )
 
 var (
@@ -124,6 +127,11 @@ func CreateAppConfig() *AppConfig {
 		disableStatus = false
 	}
 
+	useETag, err := strconv.ParseBool(os.Getenv("ENABLE_ETAG"))
+	if err != nil {
+		useETag = true
+	}
+
 	appConfig = &AppConfig{
 		IgnoreCaseInPath:      ignoreCaseInPath,
 		ShowServerHeader:      showServerHeader,
@@ -133,6 +141,7 @@ func CreateAppConfig() *AppConfig {
 		CacheControlHeader:    fmt.Sprintf(cacheControlHeaderTemplate, httpCacheMaxAge),
 		StatusEndpointEnabled: !disableStatus,
 		AdminCredentials:      createAdminCredentials(),
+		UseETag:               useETag,
 	}
 
 	return appConfig
@@ -237,8 +246,13 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 		RedirectInfoHandler(w, r.URL.Path, redirectTarget)
 	} else {
 		responseHeader := w.Header()
-		responseHeader["Content-Type"] = nil
 		AddDefaultHeadersWithCache(responseHeader)
+		responseHeader["Content-Type"] = nil
+
+		if appConfig.UseETag {
+			responseHeader.Set("ETag", etagFromData(redirectTarget))
+		}
+
 		http.Redirect(w, r, redirectTarget, http.StatusTemporaryRedirect)
 	}
 }
@@ -378,7 +392,9 @@ func RedirectInfoHandler(w http.ResponseWriter, requestPath string, target strin
 		logger.Errorf("Could not render redirect-info template: %v", err)
 	}
 
-	htmlResponse(w, http.StatusOK, &renderedBuf)
+	etagData := requestPath + target
+
+	htmlResponse(w, http.StatusOK, &renderedBuf, etagData)
 }
 
 func NotFoundHandler(w http.ResponseWriter, requestPath string) {
@@ -396,21 +412,31 @@ func NotFoundHandler(w http.ResponseWriter, requestPath string) {
 		logger.Errorf("Could not render not-found template: %v", err)
 	}
 
-	htmlResponse(w, http.StatusNotFound, &renderedBuf)
+	htmlResponse(w, http.StatusNotFound, &renderedBuf, "")
 }
 
-func htmlResponse(w http.ResponseWriter, status int, buffer *bytes.Buffer) {
+func htmlResponse(w http.ResponseWriter, status int, buffer *bytes.Buffer, etagData string) {
 	responseHeader := w.Header()
 
 	responseHeader.Set("Content-Type", "text/html; charset=utf-8")
 	responseHeader.Set("Content-Length", strconv.Itoa(buffer.Len()))
 	AddDefaultHeadersWithCache(responseHeader)
+
+	if appConfig.UseETag && len(etagData) > 0 {
+		responseHeader.Set("ETag", etagFromData(etagData))
+	}
+
 	w.WriteHeader(status)
 
 	_, err := buffer.WriteTo(w)
 	if err != nil {
 		logger.Errorf("Could not write response body: %v", err)
 	}
+}
+
+func etagFromData(data string) string {
+	hash := sha256.Sum256([]byte(data))
+	return "\"" + hex.EncodeToString(hash[:etagLength]) + "\""
 }
 
 func StartBackgroundUpdates(targetChannel chan<- RedirectMap, quitChannel <-chan bool) {
