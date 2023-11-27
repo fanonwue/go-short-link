@@ -378,12 +378,12 @@ func normalizeRedirectPathKeepLeadingSlash(path string) (string, bool) {
 }
 
 func RedirectInfoHandler(w http.ResponseWriter, requestPath string, target string) {
-	var renderedBuf bytes.Buffer
+	var renderedBuf *bytes.Buffer
 	renderedBuf.Grow(2048)
 
 	requestPath, _ = normalizeRedirectPathKeepLeadingSlash(requestPath)
 
-	err := redirectInfoTemplate.Execute(&renderedBuf, &RedirectInfoTemplateData{
+	err := redirectInfoTemplate.Execute(renderedBuf, &RedirectInfoTemplateData{
 		RedirectName: requestPath,
 		Target:       target,
 	})
@@ -394,17 +394,17 @@ func RedirectInfoHandler(w http.ResponseWriter, requestPath string, target strin
 
 	etagData := requestPath + target
 
-	htmlResponse(w, http.StatusOK, &renderedBuf, etagData)
+	htmlResponse(w, http.StatusOK, renderedBuf, etagData)
 }
 
 func NotFoundHandler(w http.ResponseWriter, requestPath string) {
-	var renderedBuf bytes.Buffer
+	var renderedBuf *bytes.Buffer
 	// Pre initialize to 2KiB, as the response will be bigger than 1KiB due to the size of the template
 	renderedBuf.Grow(2048)
 
 	requestPath, _ = normalizeRedirectPathKeepLeadingSlash(requestPath)
 
-	err := notFoundTemplate.Execute(&renderedBuf, &NotFoundTemplateData{
+	err := notFoundTemplate.Execute(renderedBuf, &NotFoundTemplateData{
 		RedirectName: requestPath,
 	})
 
@@ -412,7 +412,7 @@ func NotFoundHandler(w http.ResponseWriter, requestPath string) {
 		logger.Errorf("Could not render not-found template: %v", err)
 	}
 
-	htmlResponse(w, http.StatusNotFound, &renderedBuf, "")
+	htmlResponse(w, http.StatusNotFound, renderedBuf, "")
 }
 
 func htmlResponse(w http.ResponseWriter, status int, buffer *bytes.Buffer, etagData string) {
