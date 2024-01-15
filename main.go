@@ -81,7 +81,6 @@ const (
 )
 
 var (
-	osSignals            = make(chan os.Signal, 1)
 	appConfig            *AppConfig
 	isProd               bool
 	logger               *zap.SugaredLogger
@@ -347,6 +346,12 @@ func RedirectTargetForRequest(r *http.Request) (string, bool, bool) {
 
 	target, found := redirectState.GetTarget(normalizedPath)
 
+	// Assume it's a domain alias when the target does not start with "http"
+	if !strings.HasPrefix(target, "http") {
+		normalizedPath, _ = normalizeRedirectPath(target)
+		target, found = redirectState.GetTarget(target)
+	}
+
 	// Ignore infoRequest if there isn't a template loaded for it
 	if redirectInfoTemplate == nil {
 		infoRequest = false
@@ -539,12 +544,13 @@ func addDefaultRedirectMapHooks() {
 }
 
 func osSignalHandler() {
-	signals := []os.Signal{
+	osSignals := make(chan os.Signal, 1)
+	capturedSignals := []os.Signal{
 		syscall.SIGTERM,
 		syscall.SIGINT,
 		syscall.SIGQUIT,
 	}
-	signal.Notify(osSignals, signals...)
+	signal.Notify(osSignals, capturedSignals...)
 	sig := <-osSignals
 	logger.Debugf("Received termination signal \"%s\"", sig)
 	onExit(0)
