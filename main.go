@@ -12,10 +12,12 @@ import (
 	"html/template"
 	"net/http"
 	"os"
+	"os/signal"
 	"path"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -79,6 +81,7 @@ const (
 )
 
 var (
+	osSignals            = make(chan os.Signal, 1)
 	appConfig            *AppConfig
 	isProd               bool
 	logger               *zap.SugaredLogger
@@ -157,6 +160,8 @@ func createAdminCredentials() *AdminCredentials {
 func Setup() {
 	SetupEnvironment()
 	SetupLogging()
+
+	go osSignalHandler()
 
 	logger.Infof("Running in production mode: %s", strconv.FormatBool(isProd))
 
@@ -533,6 +538,24 @@ func addDefaultRedirectMapHooks() {
 	}
 }
 
+func osSignalHandler() {
+	signals := []os.Signal{
+		syscall.SIGTERM,
+		syscall.SIGINT,
+		syscall.SIGQUIT,
+	}
+	signal.Notify(osSignals, signals...)
+	sig := <-osSignals
+	logger.Debugf("Received termination signal \"%s\"", sig)
+	onExit(0)
+
+}
+
+func onExit(exitCode int) {
+	logger.Infof("Stopping server...")
+	os.Exit(exitCode)
+}
+
 func main() {
 	Setup()
 	// Flush log buffer before exiting
@@ -544,6 +567,8 @@ func main() {
 	}
 	err := server.ListenAndServe()
 	if err != nil {
-		return
+		onExit(0)
+	} else {
+		onExit(1)
 	}
 }
