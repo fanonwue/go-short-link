@@ -38,6 +38,7 @@ type (
 		UseETag               bool
 		UseRedirectBody       bool
 		AdminCredentials      *AdminCredentials
+		Favicon               string
 	}
 
 	NotFoundTemplateData struct {
@@ -131,6 +132,7 @@ func CreateAppConfig() *AppConfig {
 		AdminCredentials:      createAdminCredentials(),
 		UseETag:               boolConfig(prefixedEnvVar("ENABLE_ETAG"), true),
 		UseRedirectBody:       boolConfig(prefixedEnvVar("ENABLE_REDIRECT_BODY"), true),
+		Favicon:               os.Getenv(prefixedEnvVar("FAVICON")),
 	}
 
 	return appConfig
@@ -161,6 +163,15 @@ func createAdminCredentials() *AdminCredentials {
 	}
 }
 
+func createTemplate(baseTemplate *template.Template, targetTemplatePath string) (*template.Template, error) {
+	cloned, err := baseTemplate.Clone()
+	if err != nil {
+		return nil, err
+	}
+
+	return cloned.ParseFiles(targetTemplatePath)
+}
+
 func Setup() {
 	SetupEnvironment()
 	SetupLogging()
@@ -174,15 +185,27 @@ func Setup() {
 
 	var err error
 	resourcePath := "./resources"
-	baseTemplatePath := path.Join(resourcePath, "base.gohtml")
+	baseTemplate := template.Must(template.ParseFiles(path.Join(resourcePath, "base.gohtml")))
 	notFoundTemplatePath := path.Join(resourcePath, "not-found.gohtml")
 	redirectInfoTemplatePath := path.Join(resourcePath, "redirect-info.gohtml")
 
-	notFoundTemplate = template.Must(template.ParseFiles(baseTemplatePath, notFoundTemplatePath))
+	faviconTemplateString := ""
+	if len(appConfig.Favicon) > 0 {
+		faviconTemplateString = fmt.Sprintf("{{define \"icon\"}}%s{{end}}", appConfig.Favicon)
+	}
 
-	redirectInfoTemplate, err = template.ParseFiles(baseTemplatePath, redirectInfoTemplatePath)
+	notFoundTemplate = template.Must(createTemplate(baseTemplate, notFoundTemplatePath))
+
+	redirectInfoTemplate, err = createTemplate(baseTemplate, redirectInfoTemplatePath)
 	if err != nil {
 		logger.Warnf("Could not load redirect-info template file %s: %v", redirectInfoTemplatePath, err)
+	}
+
+	if len(faviconTemplateString) > 0 {
+		notFoundTemplate = template.Must(notFoundTemplate.Parse(faviconTemplateString))
+		if redirectInfoTemplate != nil {
+			redirectInfoTemplate = template.Must(redirectInfoTemplate.Parse(faviconTemplateString))
+		}
 	}
 
 	addDefaultRedirectMapHooks()
