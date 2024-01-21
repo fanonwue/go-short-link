@@ -599,8 +599,8 @@ func main() {
 	}
 	err := server.ListenAndServe()
 	if err != nil {
-		onExit(0)
-	} else {
 		onExit(1)
+	} else {
+		onExit(0)
 	}
 }
