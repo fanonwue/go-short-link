@@ -242,7 +242,10 @@ func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (RedirectMap, error) {
 	mapping := RedirectMap{}
 	updateTime := time.Now()
 
-	result, err := service.Spreadsheets.Values.Get(ds.config.SpreadsheetId, sheetsRange).Do()
+	result, err := service.Spreadsheets.Values.Get(ds.config.SpreadsheetId, sheetsRange).
+		ValueRenderOption("UNFORMATTED_VALUE").
+		Do()
+
 	if err != nil {
 		logger.Errorf("Unable to retrieve data from sheet: %v", err)
 		return nil, err
@@ -260,11 +263,17 @@ func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (RedirectMap, error) {
 		}
 
 		if len(row) > isActiveColumn {
-			rawIsActive, ok := row[isActiveColumn].(string)
+			isActive, ok := row[isActiveColumn].(bool)
+
 			if !ok {
-				continue
+				rawIsActive, ok := row[isActiveColumn].(string)
+				if !ok {
+					continue
+				}
+
+				isActive, err = strconv.ParseBool(rawIsActive)
 			}
-			isActive, err := strconv.ParseBool(rawIsActive)
+
 			if !isActive || err != nil {
 				continue
 			}
