@@ -92,13 +92,13 @@ func (conf *GoogleSheetsConfig) SheetsService() *sheets.Service {
 
 func CreateSheetsConfig() *GoogleSheetsConfig {
 	config = &GoogleSheetsConfig{
-		SpreadsheetId: os.Getenv("SPREADSHEET_ID"),
+		SpreadsheetId: os.Getenv(prefixedEnvVar("SPREADSHEET_ID")),
 		SkipFirstRow:  true,
 		Auth: GoogleAuthConfig{
-			ProjectId:           os.Getenv("PROJECT_ID"),
-			ServiceAccountMail:  os.Getenv("SERVICE_ACCOUNT_CLIENT_EMAIL"),
+			ProjectId:           os.Getenv(prefixedEnvVar("PROJECT_ID")),
+			ServiceAccountMail:  os.Getenv(prefixedEnvVar("SERVICE_ACCOUNT_CLIENT_EMAIL")),
 			ServiceAccountKey:   getServiceAccountPrivateKey(),
-			ServiceAccountKeyId: os.Getenv("SERVICE_ACCOUNT_PRIVATE_KEY_ID"),
+			ServiceAccountKeyId: os.Getenv(prefixedEnvVar("SERVICE_ACCOUNT_PRIVATE_KEY_ID")),
 		},
 	}
 	return config
@@ -134,12 +134,12 @@ func getServiceAccountPrivateKey() []byte {
 
 func readPrivateKeyData(trimWhitespace bool) []byte {
 	var keyData []byte
-	rawKey := os.Getenv("SERVICE_ACCOUNT_PRIVATE_KEY")
+	rawKey := os.Getenv(prefixedEnvVar("SERVICE_ACCOUNT_PRIVATE_KEY"))
 	if len(rawKey) > 0 {
 		key := strings.Replace(rawKey, "\\n", "\n", -1)
 		keyData = []byte(key)
 	} else {
-		keyFile := os.Getenv("SERVICE_ACCOUNT_PRIVATE_KEY_FILE")
+		keyFile := os.Getenv(prefixedEnvVar("SERVICE_ACCOUNT_PRIVATE_KEY_FILE"))
 		if len(keyFile) == 0 {
 			// Assume standard keyfile location
 			logger.Debugf("Keyfile location not set, assuming default location: %s", defaultKeyFilePath)

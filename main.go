@@ -78,6 +78,7 @@ const (
 	infoRequestIdentifier      = "+"
 	statusEndpoint             = "/_status/"
 	etagLength                 = 8
+	envVarPrefix               = "APP_"
 )
 
 var (
@@ -93,13 +94,17 @@ var (
 	}
 )
 
+func prefixedEnvVar(envVar string) string {
+	return envVarPrefix + envVar
+}
+
 func CreateAppConfig() *AppConfig {
-	port, err := strconv.ParseUint(os.Getenv("APP_PORT"), 0, 16)
+	port, err := strconv.ParseUint(os.Getenv(prefixedEnvVar("PORT")), 0, 16)
 	if err != nil {
 		port = 3000
 	}
 
-	updatePeriod, err := strconv.ParseUint(os.Getenv("UPDATE_PERIOD"), 0, 32)
+	updatePeriod, err := strconv.ParseUint(os.Getenv(prefixedEnvVar("UPDATE_PERIOD")), 0, 32)
 	if err != nil {
 		updatePeriod = defaultUpdatePeriod
 	}
@@ -110,22 +115,22 @@ func CreateAppConfig() *AppConfig {
 		updatePeriod = defaultUpdatePeriod
 	}
 
-	httpCacheMaxAge, err := strconv.ParseUint(os.Getenv("HTTP_CACHE_MAX_AGE"), 0, 32)
+	httpCacheMaxAge, err := strconv.ParseUint(os.Getenv(prefixedEnvVar("HTTP_CACHE_MAX_AGE")), 0, 32)
 	if err != nil {
 		httpCacheMaxAge = updatePeriod * 2
 	}
 
 	appConfig = &AppConfig{
-		IgnoreCaseInPath:      boolConfig("IGNORE_CASE_IN_PATH", true),
-		ShowServerHeader:      boolConfig("SHOW_SERVER_HEADER", true),
+		IgnoreCaseInPath:      boolConfig(prefixedEnvVar("IGNORE_CASE_IN_PATH"), true),
+		ShowServerHeader:      boolConfig(prefixedEnvVar("SHOW_SERVER_HEADER"), true),
 		Port:                  uint16(port),
 		UpdatePeriod:          uint32(updatePeriod),
 		HttpCacheMaxAge:       uint32(httpCacheMaxAge),
 		CacheControlHeader:    fmt.Sprintf(cacheControlHeaderTemplate, httpCacheMaxAge),
-		StatusEndpointEnabled: !boolConfig("DISABLE_STATUS", false),
+		StatusEndpointEnabled: !boolConfig(prefixedEnvVar("DISABLE_STATUS"), false),
 		AdminCredentials:      createAdminCredentials(),
-		UseETag:               boolConfig("ENABLE_ETAG", true),
-		UseRedirectBody:       boolConfig("ENABLE_REDIRECT_BODY", true),
+		UseETag:               boolConfig(prefixedEnvVar("ENABLE_ETAG"), true),
+		UseRedirectBody:       boolConfig(prefixedEnvVar("ENABLE_REDIRECT_BODY"), true),
 	}
 
 	return appConfig
@@ -140,8 +145,8 @@ func boolConfig(key string, defaultValue bool) bool {
 }
 
 func createAdminCredentials() *AdminCredentials {
-	user := os.Getenv("ADMIN_USER")
-	pass := os.Getenv("ADMIN_PASS")
+	user := os.Getenv(prefixedEnvVar("ADMIN_USER"))
+	pass := os.Getenv(prefixedEnvVar("ADMIN_PASS"))
 
 	if len(user) == 0 || len(pass) == 0 {
 		return nil
@@ -196,7 +201,7 @@ func Setup() {
 func SetupEnvironment() {
 	_ = godotenv.Load()
 	prodEnvValues := []string{"prod", "production"}
-	envValue := strings.ToLower(os.Getenv("APP_ENV"))
+	envValue := strings.ToLower(os.Getenv(prefixedEnvVar("ENV")))
 	isProd = slices.Contains(prodEnvValues, envValue)
 }
 
