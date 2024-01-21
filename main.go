@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
@@ -598,9 +599,10 @@ func main() {
 		Handler: http.HandlerFunc(ServerHandler),
 	}
 	err := server.ListenAndServe()
-	if err != nil {
-		onExit(1)
-	} else {
+	if err == nil || errors.Is(err, http.ErrServerClosed) {
 		onExit(0)
+	} else {
+		logger.Errorf("Error creating server: %v", err)
+		onExit(1)
 	}
 }
