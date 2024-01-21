@@ -27,7 +27,11 @@ type GoogleSheetsConfig struct {
 	SpreadsheetId string
 	SkipFirstRow  bool
 	Auth          GoogleAuthConfig
-	LastUpdate    *time.Time
+}
+
+type GoogleSheetsDataSource struct {
+	lastUpdate    *time.Time
+	config        GoogleSheetsConfig
 	httpClient    *http.Client
 	sheetsService *sheets.Service
 	driveService  *drive.Service
@@ -39,59 +43,8 @@ const (
 	defaultKeyFilePath = "secret/privateKey.pem"
 )
 
-var (
-	config *GoogleSheetsConfig
-)
-
-func (conf *GoogleSheetsConfig) getClient() *http.Client {
-	if conf.httpClient == nil {
-		jwtConfig := &jwt.Config{
-			Email:      conf.Auth.ServiceAccountMail,
-			PrivateKey: conf.Auth.ServiceAccountKey,
-			TokenURL:   google.JWTTokenURL,
-			Scopes: []string{
-				"https://www.googleapis.com/auth/drive.metadata.readonly",
-				"https://www.googleapis.com/auth/spreadsheets.readonly",
-			},
-		}
-
-		keyId := conf.Auth.ServiceAccountKeyId
-		if len(keyId) > 0 {
-			jwtConfig.PrivateKeyID = keyId
-		}
-
-		conf.httpClient = jwtConfig.Client(context.Background())
-	}
-
-	return conf.httpClient
-}
-
-func (conf *GoogleSheetsConfig) DriveService() *drive.Service {
-	if conf.driveService == nil {
-		newService, err := drive.NewService(context.Background(), option.WithHTTPClient(conf.getClient()))
-		if err != nil {
-			logger.Panicf("Could not create drive service: %v", err)
-		} else {
-			conf.driveService = newService
-		}
-	}
-	return conf.driveService
-}
-
-func (conf *GoogleSheetsConfig) SheetsService() *sheets.Service {
-	if conf.sheetsService == nil {
-		newService, err := sheets.NewService(context.Background(), option.WithHTTPClient(conf.getClient()))
-		if err != nil {
-			logger.Panicf("Could not create sheets service: %v", err)
-		} else {
-			conf.sheetsService = newService
-		}
-	}
-	return conf.sheetsService
-}
-
-func CreateSheetsConfig() *GoogleSheetsConfig {
-	config = &GoogleSheetsConfig{
+func createSheetsConfig() GoogleSheetsConfig {
+	config := GoogleSheetsConfig{
 		SpreadsheetId: os.Getenv(prefixedEnvVar("SPREADSHEET_ID")),
 		SkipFirstRow:  true,
 		Auth: GoogleAuthConfig{
@@ -168,25 +121,101 @@ func readPrivateKeyData(trimWhitespace bool) []byte {
 	}
 }
 
-func SpreadsheetWebLink() (string, error) {
-	service := config.DriveService()
-	file, err := service.Files.Get(config.SpreadsheetId).Fields("webViewLink").Do()
+func CreateSheetsDataSource() *GoogleSheetsDataSource {
+	_ds := GoogleSheetsDataSource{
+		config: createSheetsConfig(),
+	}
+
+	_ds.postCreate()
+
+	return &_ds
+}
+
+func (ds *GoogleSheetsDataSource) postCreate() {
+	fileWebLink, err := ds.SpreadsheetWebLink()
+	if err == nil {
+		logger.Infof("Using document available at: %s", fileWebLink)
+	}
+}
+
+func (ds *GoogleSheetsDataSource) getClient() *http.Client {
+	if ds.httpClient == nil {
+		jwtConfig := &jwt.Config{
+			Email:      ds.config.Auth.ServiceAccountMail,
+			PrivateKey: ds.config.Auth.ServiceAccountKey,
+			TokenURL:   google.JWTTokenURL,
+			Scopes: []string{
+				"https://www.googleapis.com/auth/drive.metadata.readonly",
+				"https://www.googleapis.com/auth/spreadsheets.readonly",
+			},
+		}
+
+		keyId := ds.config.Auth.ServiceAccountKeyId
+		if len(keyId) > 0 {
+			jwtConfig.PrivateKeyID = keyId
+		}
+
+		ds.httpClient = jwtConfig.Client(context.Background())
+	}
+
+	return ds.httpClient
+}
+
+func (ds *GoogleSheetsDataSource) DriveService() *drive.Service {
+	if ds.driveService == nil {
+		newService, err := drive.NewService(context.Background(), option.WithHTTPClient(ds.getClient()))
+		if err != nil {
+			logger.Panicf("Could not create drive service: %v", err)
+		} else {
+			ds.driveService = newService
+		}
+	}
+	return ds.driveService
+}
+
+func (ds *GoogleSheetsDataSource) SheetsService() *sheets.Service {
+	if ds.sheetsService == nil {
+		newService, err := sheets.NewService(context.Background(), option.WithHTTPClient(ds.getClient()))
+		if err != nil {
+			logger.Panicf("Could not create sheets service: %v", err)
+		} else {
+			ds.sheetsService = newService
+		}
+	}
+	return ds.sheetsService
+}
+
+func (ds *GoogleSheetsDataSource) SpreadsheetId() string {
+	return ds.config.SpreadsheetId
+}
+
+func (ds *GoogleSheetsDataSource) Id() string {
+	return ds.SpreadsheetId()
+}
+
+func (ds *GoogleSheetsDataSource) LastUpdate() *time.Time {
+	return ds.lastUpdate
+}
+
+func (ds *GoogleSheetsDataSource) SpreadsheetWebLink() (string, error) {
+	service := ds.DriveService()
+	file, err := service.Files.Get(ds.config.SpreadsheetId).Fields("webViewLink").Do()
 	if err != nil {
-		logger.Warnf("Could not determine webViewLink for Spreadsheet '%s': %v", config.SpreadsheetId, err)
+		logger.Warnf("Could not determine webViewLink for Spreadsheet '%s': %v", ds.config.SpreadsheetId, err)
 		return "", err
 	}
 	return file.WebViewLink, nil
 }
 
-func NeedsUpdate() bool {
-	if config.LastUpdate == nil {
+func (ds *GoogleSheetsDataSource) NeedsUpdate() bool {
+	if ds.lastUpdate == nil {
 		return true
 	}
 
-	service := config.DriveService()
-	file, err := service.Files.Get(config.SpreadsheetId).Fields("modifiedTime").Do()
+	service := ds.DriveService()
+	file, err := service.Files.Get(ds.config.SpreadsheetId).Fields("modifiedTime").Do()
 	if err != nil {
-		logger.Errorf("Could not determine modifiedTime for Spreadsheet '%s': %v", config.SpreadsheetId, err)
+		logger.Errorf("Could not determine modifiedTime for Spreadsheet '%s': %v", ds.config.SpreadsheetId, err)
 		return true
 	}
 
@@ -196,27 +225,27 @@ func NeedsUpdate() bool {
 		logger.Errorf("Could not parse RFC3339 timestamp %s: %v", modifiedTimeRaw, err)
 		return true
 	}
-	return modifiedTime.After(*config.LastUpdate)
+	return modifiedTime.After(*ds.lastUpdate)
 }
 
-func FetchRedirectMapping() (RedirectMap, error) {
-	service := config.SheetsService()
+func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (RedirectMap, error) {
+	service := ds.SheetsService()
 
 	sheetsRange := "A2:B"
-	if !config.SkipFirstRow {
+	if !ds.config.SkipFirstRow {
 		sheetsRange = "A:B"
 	}
 
 	mapping := RedirectMap{}
 	updateTime := time.Now()
 
-	result, err := service.Spreadsheets.Values.Get(config.SpreadsheetId, sheetsRange).Do()
+	result, err := service.Spreadsheets.Values.Get(ds.config.SpreadsheetId, sheetsRange).Do()
 	if err != nil {
 		logger.Errorf("Unable to retrieve data from sheet: %v", err)
 		return nil, err
 	}
 
-	config.LastUpdate = &updateTime
+	ds.lastUpdate = &updateTime
 
 	if len(result.Values) == 0 {
 		return mapping, nil

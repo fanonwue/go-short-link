@@ -60,15 +60,6 @@ type (
 		SpreadsheetId string      `json:"spreadsheetId"`
 		LastUpdate    *time.Time  `json:"lastUpdate"`
 	}
-
-	// RedirectMap is a map of string keys and string values. The key is meant to be interpreted as the redirect path,
-	// which has been provided by the user, while the value represents the redirect target (as in, where the redirect
-	// should lead to).
-	RedirectMap = map[string]string
-
-	// RedirectMapHook A function that takes a RedirectMap, processes it and returns a new RedirectMap with
-	// the processed result.
-	RedirectMapHook = func(RedirectMap) RedirectMap
 )
 
 const (
@@ -83,6 +74,7 @@ const (
 )
 
 var (
+	ds                   RedirectDataSource
 	appConfig            *AppConfig
 	isProd               bool
 	logger               *zap.SugaredLogger
@@ -181,7 +173,7 @@ func Setup() {
 	logger.Infof("Running in production mode: %s", strconv.FormatBool(isProd))
 
 	CreateAppConfig()
-	CreateSheetsConfig()
+	ds = CreateSheetsDataSource()
 
 	var err error
 	resourcePath := "./resources"
@@ -209,11 +201,6 @@ func Setup() {
 	}
 
 	addDefaultRedirectMapHooks()
-
-	fileWebLink, err := SpreadsheetWebLink()
-	if err == nil {
-		logger.Infof("Using document available at: %s", fileWebLink)
-	}
 
 	targetChannel := redirectState.ListenForUpdates()
 
@@ -306,8 +293,8 @@ func StatusEndpointHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		body = StatusInfo{
 			Mapping:       redirectState.CurrentMapping(),
-			SpreadsheetId: config.SpreadsheetId,
-			LastUpdate:    config.LastUpdate,
+			SpreadsheetId: ds.Id(),
+			LastUpdate:    ds.LastUpdate(),
 		}
 		break
 	}
@@ -486,12 +473,12 @@ func StartBackgroundUpdates(targetChannel chan<- RedirectMap, quitChannel <-chan
 }
 
 func UpdateRedirectMapping(target chan<- RedirectMap, force bool) {
-	if !force && !NeedsUpdate() {
+	if !force && !ds.NeedsUpdate() {
 		logger.Debugf("File has not changed since last update, skipping update")
 		return
 	}
 
-	fetchedMapping, err := FetchRedirectMapping()
+	fetchedMapping, err := ds.FetchRedirectMapping()
 	if err != nil {
 		logger.Warnf("Did not update redirect mapping due to an error")
 		return
