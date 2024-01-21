@@ -41,6 +41,9 @@ const (
 	// If enabled, the read key will be validated to make sure it is a PEM-formatted key
 	validateKeyContent = false
 	defaultKeyFilePath = "secret/privateKey.pem"
+	keyColumn          = 0
+	targetColumn       = 1
+	isActiveColumn     = 2
 )
 
 func createSheetsConfig() GoogleSheetsConfig {
@@ -231,9 +234,9 @@ func (ds *GoogleSheetsDataSource) NeedsUpdate() bool {
 func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (RedirectMap, error) {
 	service := ds.SheetsService()
 
-	sheetsRange := "A2:B"
+	sheetsRange := "A2:C"
 	if !ds.config.SkipFirstRow {
-		sheetsRange = "A:B"
+		sheetsRange = "A:C"
 	}
 
 	mapping := RedirectMap{}
@@ -256,10 +259,21 @@ func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (RedirectMap, error) {
 			continue
 		}
 
-		key, ok := row[0].(string)
+		if len(row) > isActiveColumn {
+			rawIsActive, ok := row[isActiveColumn].(string)
+			if !ok {
+				continue
+			}
+			isActive, err := strconv.ParseBool(rawIsActive)
+			if !isActive || err != nil {
+				continue
+			}
+		}
+
+		key, ok := row[keyColumn].(string)
 		if !ok {
 			// Check if the key is a number instead
-			intKey, ok := row[0].(int)
+			intKey, ok := row[keyColumn].(int)
 			if ok {
 				key = strconv.Itoa(intKey)
 			} else {
@@ -267,7 +281,7 @@ func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (RedirectMap, error) {
 			}
 		}
 
-		value, ok := row[1].(string)
+		value, ok := row[targetColumn].(string)
 		if !ok {
 			continue
 		}
