@@ -39,6 +39,7 @@ type (
 		UseRedirectBody       bool
 		AdminCredentials      *AdminCredentials
 		Favicon               string
+		AllowRootRedirect     bool
 	}
 
 	NotFoundTemplateData struct {
@@ -71,6 +72,7 @@ const (
 	statusEndpoint             = "/_status/"
 	etagLength                 = 8
 	envVarPrefix               = "APP_"
+	rootRedirectPath           = "__root"
 )
 
 var (
@@ -124,6 +126,7 @@ func CreateAppConfig() *AppConfig {
 		AdminCredentials:      createAdminCredentials(),
 		UseETag:               boolConfig(prefixedEnvVar("ENABLE_ETAG"), true),
 		UseRedirectBody:       boolConfig(prefixedEnvVar("ENABLE_REDIRECT_BODY"), true),
+		AllowRootRedirect:     boolConfig(prefixedEnvVar("ALLOW_ROOT_REDIRECT"), true),
 		Favicon:               os.Getenv(prefixedEnvVar("FAVICON")),
 	}
 
@@ -354,8 +357,10 @@ func checkBasicAuth(w http.ResponseWriter, r *http.Request) bool {
 func RedirectTargetForRequest(r *http.Request) (string, bool, bool) {
 	normalizedPath, infoRequest := normalizeRedirectPath(r.URL.Path)
 
+	pathEmpty := len(normalizedPath) == 0
+
 	// Try to find target by hostname if Path is empty
-	if len(normalizedPath) == 0 {
+	if pathEmpty {
 		normalizedPath, _ = normalizeRedirectPath(r.Host)
 	}
 
@@ -370,6 +375,11 @@ func RedirectTargetForRequest(r *http.Request) (string, bool, bool) {
 	// Ignore infoRequest if there isn't a template loaded for it
 	if redirectInfoTemplate == nil {
 		infoRequest = false
+	}
+
+	// If there's no entry based on hostname, try to use the special root redirect key
+	if !found && pathEmpty && appConfig.AllowRootRedirect {
+		target, found = redirectState.GetTarget(rootRedirectPath)
 	}
 
 	return target, found, infoRequest
