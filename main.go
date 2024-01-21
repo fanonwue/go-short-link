@@ -587,6 +587,7 @@ func osSignalHandler() {
 
 func onExit(exitCode int) {
 	logger.Infof("Stopping server...")
+	logger.Sync()
 	os.Exit(exitCode)
 }
 
