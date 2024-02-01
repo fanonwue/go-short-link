@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
+	"golang.org/x/net/context"
 	"html/template"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -77,6 +79,7 @@ const (
 )
 
 var (
+	server               *http.Server
 	ds                   RedirectDataSource
 	appConfig            *AppConfig
 	isProd               bool
@@ -579,30 +582,47 @@ func osSignalHandler() {
 	signal.Notify(osSignals, capturedSignals...)
 	sig := <-osSignals
 	logger.Debugf("Received termination signal \"%s\"", sig)
-	onExit(0)
-
+	if err := server.Shutdown(context.Background()); err != nil {
+		logger.Panic(err)
+	}
 }
 
-func onExit(exitCode int) {
-	logger.Infof("Stopping server...")
+func onExit() {
+	logger.Infof("Server stopped")
 	logger.Sync()
-	os.Exit(exitCode)
+}
+
+func httpServer(wg *sync.WaitGroup) *http.Server {
+	logger.Infof("Starting HTTP server on port %d", appConfig.Port)
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", appConfig.Port),
+		Handler: http.HandlerFunc(ServerHandler),
+	}
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		err := srv.ListenAndServe()
+		if !errors.Is(err, http.ErrServerClosed) {
+			logger.Errorf("Error creating server: %v", err)
+			onExit()
+			os.Exit(1)
+		}
+	}()
+
+	return srv
 }
 
 func main() {
 	Setup()
 	// Flush log buffer before exiting
 	defer logger.Sync()
-	logger.Infof("Starting HTTP server on port %d", appConfig.Port)
-	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", appConfig.Port),
-		Handler: http.HandlerFunc(ServerHandler),
-	}
-	err := server.ListenAndServe()
-	if err == nil || errors.Is(err, http.ErrServerClosed) {
-		onExit(0)
-	} else {
-		logger.Errorf("Error creating server: %v", err)
-		onExit(1)
-	}
+
+	serverClosed := sync.WaitGroup{}
+	server = httpServer(&serverClosed)
+
+	serverClosed.Wait()
+	logger.Debugf("HTTP Server closed")
+	onExit()
 }
