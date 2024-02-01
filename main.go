@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
@@ -10,7 +11,6 @@ import (
 	"fmt"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"html/template"
 	"net/http"
 	"os"
@@ -582,8 +582,13 @@ func osSignalHandler() {
 	signal.Notify(osSignals, capturedSignals...)
 	sig := <-osSignals
 	logger.Debugf("Received termination signal \"%s\"", sig)
-	if err := server.Shutdown(context.Background()); err != nil {
-		logger.Panic(err)
+	if server != nil {
+		if err := server.Shutdown(context.Background()); err != nil {
+			logger.Panic(err)
+		}
+	} else {
+		onExit()
+		os.Exit(0)
 	}
 }
 
