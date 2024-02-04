@@ -586,14 +586,19 @@ func osSignalHandler() {
 			logger.Panic(err)
 		}
 	} else {
-		logger.Infof("Shutdown before server was started")
+		onExit("Shutdown before server was started")
 		os.Exit(0)
 	}
 }
 
-func onExit() {
-	logger.Infof("Server stopped")
-	logger.Sync()
+func onExit(messages ...string) {
+	defer logger.Sync()
+	if len(messages) == 0 {
+		messages = append(messages, "Server stopped")
+	}
+	for i := range messages {
+		logger.Infof(messages[i])
+	}
 }
 
 func httpServer(shutdown chan<- error) *http.Server {
