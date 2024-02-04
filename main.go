@@ -19,7 +19,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 )
@@ -587,7 +586,7 @@ func osSignalHandler() {
 			logger.Panic(err)
 		}
 	} else {
-		onExit()
+		logger.Infof("Shutdown before server was started")
 		os.Exit(0)
 	}
 }
@@ -597,37 +596,43 @@ func onExit() {
 	logger.Sync()
 }
 
-func httpServer(wg *sync.WaitGroup) *http.Server {
+func httpServer(shutdown chan<- error) *http.Server {
 	logger.Infof("Starting HTTP server on port %d", appConfig.Port)
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", appConfig.Port),
 		Handler: http.HandlerFunc(ServerHandler),
 	}
 
-	wg.Add(1)
-
 	go func() {
-		defer wg.Done()
 		err := srv.ListenAndServe()
+		logger.Debugf("HTTP Server closed")
 		if !errors.Is(err, http.ErrServerClosed) {
 			logger.Errorf("Error creating server: %v", err)
-			onExit()
-			os.Exit(1)
+			shutdown <- err
+		} else {
+			shutdown <- nil
 		}
 	}()
 
 	return srv
 }
 
-func main() {
+func run() error {
 	Setup()
 	// Flush log buffer before exiting
 	defer logger.Sync()
 
-	serverClosed := sync.WaitGroup{}
-	server = httpServer(&serverClosed)
+	shutdownChan := make(chan error)
+	server = httpServer(shutdownChan)
 
-	serverClosed.Wait()
-	logger.Debugf("HTTP Server closed")
+	return <-shutdownChan
+}
+
+func main() {
+	err := run()
 	onExit()
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Unrecoverable Error: %v", err)
+		os.Exit(1)
+	}
 }
