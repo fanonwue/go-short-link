@@ -244,7 +244,12 @@ func SetupLogging() {
 }
 
 func ServerHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
+	if r.Method == http.MethodOptions {
+		OptionsHandler(w)
+		return
+	}
+
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		http.Error(w, "Unsupported Method", http.StatusMethodNotAllowed)
 		return
 	}
@@ -256,9 +261,9 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 
 	redirectTarget, found, infoRequest := RedirectTargetForRequest(r)
 	if !found {
-		NotFoundHandler(w, r.URL.Path)
+		NotFoundHandler(w, r, r.URL.Path)
 	} else if infoRequest && redirectInfoEndpointEnabled() {
-		RedirectInfoHandler(w, r.URL.Path, redirectTarget)
+		RedirectInfoHandler(w, r, r.URL.Path, redirectTarget)
 	} else {
 		responseHeader := w.Header()
 		AddDefaultHeadersWithCache(responseHeader)
@@ -267,12 +272,23 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 			responseHeader.Set("ETag", etagFromData(redirectTarget))
 		}
 
-		if !appConfig.UseRedirectBody {
+		if !appConfig.UseRedirectBody || noBodyRequest(r) {
 			responseHeader["Content-Type"] = nil
 		}
 
 		http.Redirect(w, r, redirectTarget, http.StatusTemporaryRedirect)
 	}
+}
+
+func noBodyRequest(r *http.Request) bool {
+	return r.Method == http.MethodHead
+}
+
+func OptionsHandler(w http.ResponseWriter) {
+	h := w.Header()
+	AddDefaultHeadersWithCache(h)
+	h.Set("Allow", "OPTIONS, GET, HEAD")
+	w.WriteHeader(http.StatusOK)
 }
 
 func StatusEndpointHandler(w http.ResponseWriter, r *http.Request) {
@@ -305,9 +321,7 @@ func StatusEndpointHandler(w http.ResponseWriter, r *http.Request) {
 		break
 	}
 
-	if body != nil {
-		h.Set("Content-Type", "application/json")
-	} else {
+	if body == nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
@@ -319,11 +333,14 @@ func StatusEndpointHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.Set("Content-Type", "application/json")
 	h.Set("Content-Length", strconv.Itoa(buf.Len()))
 
-	_, err = buf.WriteTo(w)
-	if err != nil {
-		logger.Errorf("Error writing status data to response body: %v", err)
+	if !noBodyRequest(r) {
+		_, err = buf.WriteTo(w)
+		if err != nil {
+			logger.Errorf("Error writing status data to response body: %v", err)
+		}
 	}
 }
 
@@ -408,7 +425,7 @@ func normalizeRedirectPathKeepLeadingSlash(path string) (string, bool) {
 	return normalizedPath, infoRequest
 }
 
-func RedirectInfoHandler(w http.ResponseWriter, requestPath string, target string) {
+func RedirectInfoHandler(w http.ResponseWriter, r *http.Request, requestPath string, target string) {
 	renderedBuf := new(bytes.Buffer)
 	renderedBuf.Grow(2048)
 
@@ -425,11 +442,12 @@ func RedirectInfoHandler(w http.ResponseWriter, requestPath string, target strin
 
 	etagData := requestPath + target
 
-	htmlResponse(w, http.StatusOK, renderedBuf, etagData)
+	htmlResponse(w, r, http.StatusOK, renderedBuf, etagData)
 }
 
-func NotFoundHandler(w http.ResponseWriter, requestPath string) {
+func NotFoundHandler(w http.ResponseWriter, r *http.Request, requestPath string) {
 	renderedBuf := new(bytes.Buffer)
+
 	// Pre initialize to 2KiB, as the response will be bigger than 1KiB due to the size of the template
 	renderedBuf.Grow(2048)
 
@@ -443,15 +461,16 @@ func NotFoundHandler(w http.ResponseWriter, requestPath string) {
 		logger.Errorf("Could not render not-found template: %v", err)
 	}
 
-	htmlResponse(w, http.StatusNotFound, renderedBuf, "")
+	htmlResponse(w, r, http.StatusNotFound, renderedBuf, "")
 }
 
-func htmlResponse(w http.ResponseWriter, status int, buffer *bytes.Buffer, etagData string) {
+func htmlResponse(w http.ResponseWriter, r *http.Request, status int, buffer *bytes.Buffer, etagData string) {
 	responseHeader := w.Header()
+
+	AddDefaultHeadersWithCache(responseHeader)
 
 	responseHeader.Set("Content-Type", "text/html; charset=utf-8")
 	responseHeader.Set("Content-Length", strconv.Itoa(buffer.Len()))
-	AddDefaultHeadersWithCache(responseHeader)
 
 	if appConfig.UseETag && len(etagData) > 0 {
 		responseHeader.Set("ETag", etagFromData(etagData))
@@ -459,9 +478,11 @@ func htmlResponse(w http.ResponseWriter, status int, buffer *bytes.Buffer, etagD
 
 	w.WriteHeader(status)
 
-	_, err := buffer.WriteTo(w)
-	if err != nil {
-		logger.Errorf("Could not write response body: %v", err)
+	if !noBodyRequest(r) {
+		_, err := buffer.WriteTo(w)
+		if err != nil {
+			logger.Errorf("Could not write response body: %v", err)
+		}
 	}
 }
 
