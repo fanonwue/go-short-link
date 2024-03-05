@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -42,6 +43,7 @@ type (
 		AdminCredentials      *AdminCredentials
 		Favicon               string
 		AllowRootRedirect     bool
+		FallbackFile          string
 	}
 
 	NotFoundTemplateData struct {
@@ -62,6 +64,11 @@ type (
 		Mapping       RedirectMap `json:"mapping"`
 		SpreadsheetId string      `json:"spreadsheetId"`
 		LastUpdate    *time.Time  `json:"lastUpdate"`
+	}
+
+	FallbackFileEntry struct {
+		Key    string `json:"key"`
+		Target string `json:"target"`
 	}
 )
 
@@ -131,6 +138,7 @@ func CreateAppConfig() *AppConfig {
 		UseRedirectBody:       boolConfig(prefixedEnvVar("ENABLE_REDIRECT_BODY"), true),
 		AllowRootRedirect:     boolConfig(prefixedEnvVar("ALLOW_ROOT_REDIRECT"), true),
 		Favicon:               os.Getenv(prefixedEnvVar("FAVICON")),
+		FallbackFile:          os.Getenv(prefixedEnvVar("FALLBACK_FILE")),
 	}
 
 	return appConfig
@@ -512,10 +520,21 @@ func UpdateRedirectMapping(target chan<- RedirectMap, force bool) {
 		return
 	}
 
-	fetchedMapping, err := ds.FetchRedirectMapping()
-	if err != nil {
-		logger.Warnf("Did not update redirect mapping due to an error")
-		return
+	fetchedMapping, fetchErr := ds.FetchRedirectMapping()
+	if fetchErr != nil {
+		logger.Warnf("Error fetching new redirect mapping: %v", fetchErr)
+		if len(appConfig.FallbackFile) > 0 {
+			fallbackMap, err := readFallbackFile(appConfig.FallbackFile)
+			if err != nil {
+				logger.Errorf("Redirect map fetch failed, and reading the fallback file failed due to: %v", err)
+				return
+			}
+			fetchedMapping = fallbackMap
+			logger.Infof("Read from fallback file")
+		} else {
+			logger.Warnf("Fallback file disabled")
+			return
+		}
 	}
 
 	var newMap = fetchedMapping
@@ -524,7 +543,70 @@ func UpdateRedirectMapping(target chan<- RedirectMap, force bool) {
 		newMap = hook(newMap)
 	}
 
+	if fetchErr == nil {
+		err := writeFallbackFile(appConfig.FallbackFile, newMap)
+		if err != nil {
+			logger.Warnf("Error writing fallback file: %v", err)
+		}
+	}
+
 	target <- newMap
+}
+
+func writeFallbackFile(path string, newMapping RedirectMap) error {
+	jsonEntries := make([]FallbackFileEntry, len(newMapping))
+
+	i := 0
+	for key, target := range newMapping {
+		jsonEntries[i] = FallbackFileEntry{
+			Key:    key,
+			Target: target,
+		}
+		i++
+	}
+
+	jsonBytes, err := json.Marshal(&jsonEntries)
+	if err != nil {
+		logger.Warnf("Error marshaling fallback file entries to JSON: %v", err)
+		return err
+	}
+
+	err = os.MkdirAll(filepath.Dir(path), 0755)
+	if err != nil {
+		logger.Warnf("Error creating fallback file directory: %v", err)
+		return err
+	}
+
+	err = os.WriteFile(path, jsonBytes, 0644)
+	if err != nil {
+		logger.Warnf("Error writing fallback file: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func readFallbackFile(path string) (RedirectMap, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		logger.Warnf("Error reading fallback file: %v", err)
+		return nil, err
+	}
+
+	var entries []FallbackFileEntry
+	err = json.Unmarshal(data, &entries)
+	if err != nil {
+		logger.Warnf("Error unmarshaling fallback file: %v", err)
+		return nil, err
+	}
+
+	mapping := RedirectMap{}
+
+	for _, entry := range entries {
+		mapping[entry.Key] = entry.Target
+	}
+
+	return mapping, nil
 }
 
 func AddDefaultHeaders(h http.Header) {
