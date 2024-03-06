@@ -331,8 +331,8 @@ func StatusInfoHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func wrapHandler(handlerFunc func(http.ResponseWriter, *http.Request)) WrappedHandler {
-	return WrappedHandler{
+func wrapHandler(handlerFunc func(http.ResponseWriter, *http.Request)) wrappedHandler {
+	return wrappedHandler{
 		handler: handlerFunc,
 	}
 }
@@ -750,11 +750,11 @@ func main() {
 
 // ------------- Custom HTTP Handler stuff
 
-type WrappedHandler struct {
+type wrappedHandler struct {
 	handler http.HandlerFunc
 }
 
-func (wh WrappedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (wh wrappedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		OptionsHandler(w)
 		return
