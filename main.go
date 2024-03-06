@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
@@ -78,11 +76,9 @@ const (
 	defaultUpdatePeriod        = 300
 	minimumUpdatePeriod        = 15
 	infoRequestIdentifier      = "+"
-	statusEndpoint             = "/_status/"
 	etagLength                 = 8
 	envVarPrefix               = "APP_"
 	rootRedirectPath           = "__root"
-	requestTimeout             = 5 * time.Second
 )
 
 var (
@@ -98,7 +94,6 @@ var (
 		mapping: RedirectMap{},
 		hooks:   make([]RedirectMapHook, 0),
 	}
-	supportedMethods = []string{http.MethodGet, http.MethodHead, http.MethodOptions}
 )
 
 func prefixedEnvVar(envVar string) string {
@@ -329,46 +324,6 @@ func StatusInfoHandler(w http.ResponseWriter, r *http.Request) {
 		SpreadsheetId: ds.Id(),
 		LastUpdate:    ds.LastUpdate(),
 	})
-}
-
-func wrapHandler(handlerFunc func(http.ResponseWriter, *http.Request)) wrappedHandler {
-	return wrappedHandler{
-		handler: handlerFunc,
-	}
-}
-
-func wrapHandlerTimeout(handlerFunc func(http.ResponseWriter, *http.Request)) http.Handler {
-	return http.TimeoutHandler(wrapHandler(handlerFunc), requestTimeout, "Request timeout exceeded")
-}
-
-func checkBasicAuth(w http.ResponseWriter, r *http.Request) bool {
-	creds := appConfig.AdminCredentials
-	if creds == nil {
-		return true
-	}
-
-	onUnauthorized := func() bool {
-		w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return false
-	}
-
-	user, pass, ok := r.BasicAuth()
-	if !ok {
-		return onUnauthorized()
-	}
-
-	userHash := sha256.Sum256([]byte(user))
-	passHash := sha256.Sum256([]byte(pass))
-
-	userMatched := subtle.ConstantTimeCompare(creds.UserHash, userHash[:]) == 1
-	passMatched := subtle.ConstantTimeCompare(creds.PassHash, passHash[:]) == 1
-
-	if userMatched && passMatched {
-		return true
-	} else {
-		return onUnauthorized()
-	}
 }
 
 func RedirectTargetForRequest(r *http.Request) (string, bool, bool) {
@@ -693,48 +648,13 @@ func onExit(messages ...string) {
 	}
 }
 
-func httpServer(shutdown chan<- error) *http.Server {
-	logger.Infof("Starting HTTP server on port %d", appConfig.Port)
-
-	mux := http.NewServeMux()
-
-	// Default handler
-	mux.Handle("/", wrapHandlerTimeout(ServerHandler))
-
-	if appConfig.StatusEndpointEnabled {
-		mux.Handle(statusEndpoint+"health", wrapHandlerTimeout(StatusHealthHandler))
-		mux.Handle(statusEndpoint+"info", wrapHandlerTimeout(StatusInfoHandler))
-	}
-
-	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", appConfig.Port),
-		Handler:      mux,
-		ReadTimeout:  requestTimeout,
-		WriteTimeout: requestTimeout,
-		IdleTimeout:  10 * time.Second,
-	}
-
-	go func() {
-		err := srv.ListenAndServe()
-		logger.Debugf("HTTP Server closed")
-		if !errors.Is(err, http.ErrServerClosed) {
-			logger.Errorf("Error creating server: %v", err)
-			shutdown <- err
-		} else {
-			shutdown <- nil
-		}
-	}()
-
-	return srv
-}
-
 func run() error {
 	Setup()
 	// Flush log buffer before exiting
 	defer logger.Sync()
 
 	shutdownChan := make(chan error)
-	server = httpServer(shutdownChan)
+	server = CreateHttpServer(shutdownChan)
 
 	return <-shutdownChan
 }
@@ -746,24 +666,4 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "Unrecoverable Error: %v", err)
 		os.Exit(1)
 	}
-}
-
-// ------------- Custom HTTP Handler stuff
-
-type wrappedHandler struct {
-	handler http.HandlerFunc
-}
-
-func (wh wrappedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodOptions {
-		OptionsHandler(w)
-		return
-	}
-
-	if !slices.Contains(supportedMethods, r.Method) {
-		http.Error(w, "Method Not Allowed - only GET, HEAD and OPTIONS are allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	wh.handler(w, r)
 }
