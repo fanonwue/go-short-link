@@ -330,19 +330,9 @@ func StatusInfoHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func wrapHandler(handler func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodOptions {
-			OptionsHandler(w)
-			return
-		}
-
-		if !slices.Contains(supportedMethods, r.Method) {
-			http.Error(w, "Unsupported Method", http.StatusMethodNotAllowed)
-			return
-		}
-
-		handler(w, r)
+func wrapHandler(handler func(http.ResponseWriter, *http.Request)) WrappedHandler {
+	return WrappedHandler{
+		handler: handler,
 	}
 }
 
@@ -704,11 +694,11 @@ func httpServer(shutdown chan<- error) *http.Server {
 	mux := http.NewServeMux()
 
 	// Default handler
-	mux.HandleFunc("/", wrapHandler(ServerHandler))
+	mux.Handle("/", wrapHandler(ServerHandler))
 
 	if appConfig.StatusEndpointEnabled {
-		mux.HandleFunc(statusEndpoint+"health", wrapHandler(StatusHealthHandler))
-		mux.HandleFunc(statusEndpoint+"info", wrapHandler(StatusInfoHandler))
+		mux.Handle(statusEndpoint+"health", wrapHandler(StatusHealthHandler))
+		mux.Handle(statusEndpoint+"info", wrapHandler(StatusInfoHandler))
 	}
 
 	srv := &http.Server{
@@ -751,4 +741,24 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "Unrecoverable Error: %v", err)
 		os.Exit(1)
 	}
+}
+
+// ------------- Custom HTTP Handler stuff
+
+type WrappedHandler struct {
+	handler http.HandlerFunc
+}
+
+func (wh WrappedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		OptionsHandler(w)
+		return
+	}
+
+	if !slices.Contains(supportedMethods, r.Method) {
+		http.Error(w, "Unsupported Method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	wh.handler(w, r)
 }
