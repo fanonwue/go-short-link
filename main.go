@@ -756,7 +756,7 @@ func (wh WrappedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !slices.Contains(supportedMethods, r.Method) {
-		http.Error(w, "Unsupported Method", http.StatusMethodNotAllowed)
+		http.Error(w, "Method Not Allowed - only GET, HEAD and OPTIONS are allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
