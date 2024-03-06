@@ -97,6 +97,7 @@ var (
 		mapping: RedirectMap{},
 		hooks:   make([]RedirectMapHook, 0),
 	}
+	supportedMethods = []string{http.MethodGet, http.MethodHead, http.MethodOptions}
 )
 
 func prefixedEnvVar(envVar string) string {
@@ -252,21 +253,6 @@ func SetupLogging() {
 }
 
 func ServerHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodOptions {
-		OptionsHandler(w)
-		return
-	}
-
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		http.Error(w, "Unsupported Method", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if appConfig.StatusEndpointEnabled && strings.HasPrefix(strings.TrimRight(r.URL.Path, "/"), statusEndpoint) {
-		StatusEndpointHandler(w, r)
-		return
-	}
-
 	redirectTarget, found, infoRequest := RedirectTargetForRequest(r)
 	if !found {
 		NotFoundHandler(w, r, r.URL.Path)
@@ -299,46 +285,17 @@ func OptionsHandler(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func StatusEndpointHandler(w http.ResponseWriter, r *http.Request) {
+func statusResponse(w http.ResponseWriter, r *http.Request, body any) error {
 	var buf bytes.Buffer
-
-	pathParts := strings.Split(r.URL.Path, "/")
-	endpoint := pathParts[len(pathParts)-1]
-
 	h := w.Header()
 	AddDefaultHeaders(h)
 
-	var body any
-
-	switch endpoint {
-	case "health":
-		body = StatusHealthcheck{
-			MappingSize: redirectState.MappingSize(),
-			Running:     true,
-		}
-		break
-	case "info":
-		if !checkBasicAuth(w, r) {
-			return
-		}
-		body = StatusInfo{
-			Mapping:       redirectState.CurrentMapping(),
-			SpreadsheetId: ds.Id(),
-			LastUpdate:    ds.LastUpdate(),
-		}
-		break
-	}
-
-	if body == nil {
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
 	err := json.NewEncoder(&buf).Encode(body)
+
 	if err != nil {
 		logger.Errorf("Error writing status data to buffer: %v", err)
 		http.Error(w, "Unknown Error", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	h.Set("Content-Type", "application/json")
@@ -349,6 +306,43 @@ func StatusEndpointHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			logger.Errorf("Error writing status data to response body: %v", err)
 		}
+		return err
+	}
+	return nil
+}
+
+func StatusHealthHandler(w http.ResponseWriter, r *http.Request) {
+	_ = statusResponse(w, r, StatusHealthcheck{
+		MappingSize: redirectState.MappingSize(),
+		Running:     true,
+	})
+}
+
+func StatusInfoHandler(w http.ResponseWriter, r *http.Request) {
+	if !checkBasicAuth(w, r) {
+		return
+	}
+
+	_ = statusResponse(w, r, StatusInfo{
+		Mapping:       redirectState.CurrentMapping(),
+		SpreadsheetId: ds.Id(),
+		LastUpdate:    ds.LastUpdate(),
+	})
+}
+
+func wrapHandler(handler func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			OptionsHandler(w)
+			return
+		}
+
+		if !slices.Contains(supportedMethods, r.Method) {
+			http.Error(w, "Unsupported Method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		handler(w, r)
 	}
 }
 
@@ -706,9 +700,23 @@ func onExit(messages ...string) {
 
 func httpServer(shutdown chan<- error) *http.Server {
 	logger.Infof("Starting HTTP server on port %d", appConfig.Port)
+
+	mux := http.NewServeMux()
+
+	// Default handler
+	mux.HandleFunc("/", wrapHandler(ServerHandler))
+
+	if appConfig.StatusEndpointEnabled {
+		mux.HandleFunc(statusEndpoint+"health", wrapHandler(StatusHealthHandler))
+		mux.HandleFunc(statusEndpoint+"info", wrapHandler(StatusInfoHandler))
+	}
+
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", appConfig.Port),
-		Handler: http.HandlerFunc(ServerHandler),
+		Addr:         fmt.Sprintf(":%d", appConfig.Port),
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		IdleTimeout:  10 * time.Second,
 	}
 
 	go func() {
