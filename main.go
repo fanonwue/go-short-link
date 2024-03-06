@@ -96,6 +96,10 @@ var (
 	}
 )
 
+func (ac *AppConfig) UseFallbackFile() bool {
+	return len(ac.FallbackFile) > 0
+}
+
 func prefixedEnvVar(envVar string) string {
 	return envVarPrefix + envVar
 }
@@ -209,6 +213,10 @@ func Setup() {
 		if redirectInfoTemplate != nil {
 			redirectInfoTemplate = template.Must(redirectInfoTemplate.Parse(faviconTemplateString))
 		}
+	}
+
+	if appConfig.UseFallbackFile() {
+		logger.Infof("Fallback file enabled at path: %s", appConfig.FallbackFile)
 	}
 
 	addDefaultRedirectMapHooks()
@@ -467,7 +475,7 @@ func UpdateRedirectMapping(target chan<- RedirectMap, force bool) {
 	fetchedMapping, fetchErr := ds.FetchRedirectMapping()
 	if fetchErr != nil {
 		logger.Warnf("Error fetching new redirect mapping: %v", fetchErr)
-		if len(appConfig.FallbackFile) > 0 {
+		if appConfig.UseFallbackFile() {
 			fallbackMap, err := readFallbackFile(appConfig.FallbackFile)
 			if err != nil {
 				logger.Errorf("Redirect map fetch failed, and reading the fallback file failed due to: %v", err)
@@ -487,7 +495,7 @@ func UpdateRedirectMapping(target chan<- RedirectMap, force bool) {
 		newMap = hook(newMap)
 	}
 
-	if fetchErr == nil {
+	if fetchErr == nil && appConfig.UseFallbackFile() {
 		err := writeFallbackFile(appConfig.FallbackFile, newMap)
 		if err != nil {
 			logger.Warnf("Error writing fallback file: %v", err)
@@ -498,6 +506,11 @@ func UpdateRedirectMapping(target chan<- RedirectMap, force bool) {
 }
 
 func writeFallbackFile(path string, newMapping RedirectMap) error {
+	if len(path) == 0 {
+		logger.Debugf("Fallback file path is empty, skipping write")
+		return nil
+	}
+
 	jsonEntries := make([]FallbackFileEntry, len(newMapping))
 
 	i := 0
