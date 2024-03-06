@@ -6,11 +6,11 @@ type (
 	// RedirectMap is a map of string keys and string values. The key is meant to be interpreted as the redirect path,
 	// which has been provided by the user, while the value represents the redirect target (as in, where the redirect
 	// should lead to).
-	RedirectMap = map[string]string
+	RedirectMap map[string]string
 
 	// RedirectMapHook A function that takes a RedirectMap, processes it and returns a new RedirectMap with
 	// the processed result.
-	RedirectMapHook = func(RedirectMap) RedirectMap
+	RedirectMapHook func(RedirectMap) RedirectMap
 
 	RedirectMapState struct {
 		mapping RedirectMap
