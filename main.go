@@ -589,7 +589,7 @@ func readFallbackFile(path string) (RedirectMap, error) {
 		return nil, err
 	}
 
-	mapping := RedirectMap{}
+	mapping := make(RedirectMap, len(entries))
 
 	for _, entry := range entries {
 		mapping[entry.Key] = entry.Target
