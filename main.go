@@ -82,6 +82,7 @@ const (
 	etagLength                 = 8
 	envVarPrefix               = "APP_"
 	rootRedirectPath           = "__root"
+	requestTimeout             = 5 * time.Second
 )
 
 var (
@@ -330,10 +331,14 @@ func StatusInfoHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func wrapHandler(handler func(http.ResponseWriter, *http.Request)) WrappedHandler {
+func wrapHandler(handlerFunc func(http.ResponseWriter, *http.Request)) WrappedHandler {
 	return WrappedHandler{
-		handler: handler,
+		handler: handlerFunc,
 	}
+}
+
+func wrapHandlerTimeout(handlerFunc func(http.ResponseWriter, *http.Request)) http.Handler {
+	return http.TimeoutHandler(wrapHandler(handlerFunc), requestTimeout, "Request timeout exceeded")
 }
 
 func checkBasicAuth(w http.ResponseWriter, r *http.Request) bool {
@@ -694,18 +699,18 @@ func httpServer(shutdown chan<- error) *http.Server {
 	mux := http.NewServeMux()
 
 	// Default handler
-	mux.Handle("/", wrapHandler(ServerHandler))
+	mux.Handle("/", wrapHandlerTimeout(ServerHandler))
 
 	if appConfig.StatusEndpointEnabled {
-		mux.Handle(statusEndpoint+"health", wrapHandler(StatusHealthHandler))
-		mux.Handle(statusEndpoint+"info", wrapHandler(StatusInfoHandler))
+		mux.Handle(statusEndpoint+"health", wrapHandlerTimeout(StatusHealthHandler))
+		mux.Handle(statusEndpoint+"info", wrapHandlerTimeout(StatusInfoHandler))
 	}
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", appConfig.Port),
 		Handler:      mux,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
+		ReadTimeout:  requestTimeout,
+		WriteTimeout: requestTimeout,
 		IdleTimeout:  10 * time.Second,
 	}
 
