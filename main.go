@@ -185,6 +185,7 @@ func Setup() {
 
 	go osSignalHandler()
 
+	logger.Infof("----- STARTING GO-SHORT-LINK SERVER -----")
 	logger.Infof("Running in production mode: %s", strconv.FormatBool(isProd))
 
 	CreateAppConfig()
