@@ -240,7 +240,7 @@ func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (RedirectMap, error) {
 	}
 
 	mapping := RedirectMap{}
-	updateTime := time.Now()
+	updateTime := time.Now().UTC()
 
 	result, err := service.Spreadsheets.Values.Get(ds.config.SpreadsheetId, sheetsRange).
 		ValueRenderOption("UNFORMATTED_VALUE").
