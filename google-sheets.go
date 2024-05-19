@@ -31,6 +31,7 @@ type GoogleSheetsConfig struct {
 
 type GoogleSheetsDataSource struct {
 	lastUpdate    *time.Time
+	lastModified  *time.Time
 	config        GoogleSheetsConfig
 	httpClient    *http.Client
 	sheetsService *sheets.Service
@@ -196,8 +197,8 @@ func (ds *GoogleSheetsDataSource) Id() string {
 	return ds.SpreadsheetId()
 }
 
-func (ds *GoogleSheetsDataSource) LastUpdate() *time.Time {
-	return ds.lastUpdate
+func (ds *GoogleSheetsDataSource) LastUpdate() (*time.Time, error) {
+	return ds.lastUpdate, nil
 }
 
 func (ds *GoogleSheetsDataSource) SpreadsheetWebLink() (string, error) {
@@ -210,24 +211,44 @@ func (ds *GoogleSheetsDataSource) SpreadsheetWebLink() (string, error) {
 	return file.WebViewLink, nil
 }
 
-func (ds *GoogleSheetsDataSource) NeedsUpdate() bool {
-	if ds.lastUpdate == nil {
-		return true
-	}
-
+func (ds *GoogleSheetsDataSource) updateLastModified() (*time.Time, error) {
 	service := ds.DriveService()
 	file, err := service.Files.Get(ds.config.SpreadsheetId).Fields("modifiedTime").Do()
 	if err != nil {
 		logger.Errorf("Could not determine modifiedTime for Spreadsheet '%s': %v", ds.config.SpreadsheetId, err)
-		return true
+		return nil, err
 	}
 
 	modifiedTimeRaw := file.ModifiedTime
 	modifiedTime, err := time.Parse(time.RFC3339, modifiedTimeRaw)
 	if err != nil {
 		logger.Errorf("Could not parse RFC3339 timestamp %s: %v", modifiedTimeRaw, err)
+		return nil, err
+	}
+
+	modifiedTimeUtc := modifiedTime.UTC()
+	ds.lastModified = &modifiedTimeUtc
+	return ds.lastModified, nil
+}
+
+func (ds *GoogleSheetsDataSource) LastModified() (*time.Time, error) {
+	if ds.lastModified == nil {
+		return ds.updateLastModified()
+	}
+
+	return ds.lastModified, nil
+}
+
+func (ds *GoogleSheetsDataSource) NeedsUpdate() bool {
+	if ds.lastUpdate == nil {
 		return true
 	}
+
+	modifiedTime, err := ds.updateLastModified()
+	if err != nil {
+		return true
+	}
+
 	return modifiedTime.After(*ds.lastUpdate)
 }
 
