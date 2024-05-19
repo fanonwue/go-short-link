@@ -211,6 +211,17 @@ func (ds *GoogleSheetsDataSource) SpreadsheetWebLink() (string, error) {
 	return file.WebViewLink, nil
 }
 
+func (ds *GoogleSheetsDataSource) updateLastUpdate(updateTime *time.Time) *time.Time {
+	if updateTime == nil {
+		now := time.Now()
+		updateTime = &now
+	}
+
+	updateTimeUtc := updateTime.UTC()
+	ds.lastUpdate = &updateTimeUtc
+	return ds.lastUpdate
+}
+
 func (ds *GoogleSheetsDataSource) updateLastModified() (*time.Time, error) {
 	service := ds.DriveService()
 	file, err := service.Files.Get(ds.config.SpreadsheetId).Fields("modifiedTime").Do()
@@ -273,7 +284,7 @@ func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (RedirectMap, error) {
 		return nil, err
 	}
 
-	ds.lastUpdate = &updateTime
+	ds.updateLastUpdate(&updateTime)
 
 	if len(result.Values) == 0 {
 		return mapping, nil
