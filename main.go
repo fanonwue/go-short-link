@@ -331,14 +331,11 @@ func StatusInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lastUpdate, _ := ds.LastUpdate()
-	lastModified, _ := ds.LastModified()
-
 	_ = statusResponse(w, r, StatusInfo{
 		Mapping:       redirectState.CurrentMapping(),
 		SpreadsheetId: ds.Id(),
-		LastUpdate:    lastUpdate,
-		LastModified:  lastModified,
+		LastUpdate:    ds.LastUpdate(),
+		LastModified:  ds.LastModified(),
 	})
 }
 

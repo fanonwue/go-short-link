@@ -197,8 +197,8 @@ func (ds *GoogleSheetsDataSource) Id() string {
 	return ds.SpreadsheetId()
 }
 
-func (ds *GoogleSheetsDataSource) LastUpdate() (*time.Time, error) {
-	return ds.lastUpdate, nil
+func (ds *GoogleSheetsDataSource) LastUpdate() *time.Time {
+	return ds.lastUpdate
 }
 
 func (ds *GoogleSheetsDataSource) SpreadsheetWebLink() (string, error) {
@@ -231,12 +231,13 @@ func (ds *GoogleSheetsDataSource) updateLastModified() (*time.Time, error) {
 	return ds.lastModified, nil
 }
 
-func (ds *GoogleSheetsDataSource) LastModified() (*time.Time, error) {
+func (ds *GoogleSheetsDataSource) LastModified() *time.Time {
 	if ds.lastModified == nil {
-		return ds.updateLastModified()
+		modified, _ := ds.updateLastModified()
+		return modified
 	}
 
-	return ds.lastModified, nil
+	return ds.lastModified
 }
 
 func (ds *GoogleSheetsDataSource) NeedsUpdate() bool {
