@@ -149,8 +149,8 @@ func (ds *GoogleSheetsDataSource) getClient() *http.Client {
 			PrivateKey: ds.config.Auth.ServiceAccountKey,
 			TokenURL:   google.JWTTokenURL,
 			Scopes: []string{
-				"https://www.googleapis.com/auth/drive.metadata.readonly",
-				"https://www.googleapis.com/auth/spreadsheets.readonly",
+				drive.DriveMetadataReadonlyScope,
+				sheets.SpreadsheetsReadonlyScope,
 			},
 		}
 
