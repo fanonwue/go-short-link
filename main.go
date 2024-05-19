@@ -62,6 +62,7 @@ type (
 		Mapping       RedirectMap `json:"mapping"`
 		SpreadsheetId string      `json:"spreadsheetId"`
 		LastUpdate    *time.Time  `json:"lastUpdate"`
+		LastModified  *time.Time  `json:"LastModified"`
 	}
 
 	FallbackFileEntry struct {
@@ -268,7 +269,9 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 		AddDefaultHeadersWithCache(responseHeader)
 
 		if appConfig.UseETag {
-			responseHeader.Set("ETag", etagFromData(redirectTarget))
+			requestPath, _ := normalizeRedirectPath(r.URL.Path)
+			etagData := redirectEtag(requestPath, redirectTarget, "redirect")
+			responseHeader.Set("ETag", etagFromData(etagData))
 		}
 
 		if !appConfig.UseRedirectBody || noBodyRequest(r) {
@@ -328,10 +331,14 @@ func StatusInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	lastUpdate, _ := ds.LastUpdate()
+	lastModified, _ := ds.LastModified()
+
 	_ = statusResponse(w, r, StatusInfo{
 		Mapping:       redirectState.CurrentMapping(),
 		SpreadsheetId: ds.Id(),
-		LastUpdate:    ds.LastUpdate(),
+		LastUpdate:    lastUpdate,
+		LastModified:  lastModified,
 	})
 }
 
@@ -401,7 +408,7 @@ func RedirectInfoHandler(w http.ResponseWriter, r *http.Request, requestPath str
 		logger.Errorf("Could not render redirect-info template: %v", err)
 	}
 
-	etagData := requestPath + target
+	etagData := redirectEtag(requestPath, target, "info")
 
 	htmlResponse(w, r, http.StatusOK, renderedBuf, etagData)
 }
@@ -445,6 +452,10 @@ func htmlResponse(w http.ResponseWriter, r *http.Request, status int, buffer *by
 			logger.Errorf("Could not write response body: %v", err)
 		}
 	}
+}
+
+func redirectEtag(requestPath string, target string, suffix string) string {
+	return requestPath + "#" + target + "#" + suffix
 }
 
 func etagFromData(data string) string {
