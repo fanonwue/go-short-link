@@ -26,7 +26,8 @@ type GoogleAuthConfig struct {
 type GoogleSheetsConfig struct {
 	SpreadsheetId string
 	SkipFirstRow  bool
-	Auth          GoogleAuthConfig
+	ApiKey        string
+	Auth          *GoogleAuthConfig
 }
 
 type GoogleSheetsDataSource struct {
@@ -51,13 +52,22 @@ func createSheetsConfig() GoogleSheetsConfig {
 	config := GoogleSheetsConfig{
 		SpreadsheetId: os.Getenv(prefixedEnvVar("SPREADSHEET_ID")),
 		SkipFirstRow:  true,
-		Auth: GoogleAuthConfig{
+	}
+
+	apiKey := os.Getenv(prefixedEnvVar("API_KEY"))
+
+	if len(apiKey) == 0 {
+		auth := GoogleAuthConfig{
 			ProjectId:           os.Getenv(prefixedEnvVar("PROJECT_ID")),
 			ServiceAccountMail:  os.Getenv(prefixedEnvVar("SERVICE_ACCOUNT_CLIENT_EMAIL")),
 			ServiceAccountKey:   getServiceAccountPrivateKey(),
 			ServiceAccountKeyId: os.Getenv(prefixedEnvVar("SERVICE_ACCOUNT_PRIVATE_KEY_ID")),
-		},
+		}
+		config.Auth = &auth
+	} else {
+		config.ApiKey = apiKey
 	}
+
 	return config
 }
 
@@ -135,6 +145,17 @@ func CreateSheetsDataSource() *GoogleSheetsDataSource {
 	return &_ds
 }
 
+func (dsc *GoogleSheetsConfig) UseServiceAccount() bool {
+	return dsc.Auth != nil
+}
+
+func (ds *GoogleSheetsDataSource) apiScopes() []string {
+	return []string{
+		drive.DriveMetadataReadonlyScope,
+		sheets.SpreadsheetsReadonlyScope,
+	}
+}
+
 func (ds *GoogleSheetsDataSource) postCreate() {
 	fileWebLink, err := ds.SpreadsheetWebLink()
 	if err == nil {
@@ -144,30 +165,46 @@ func (ds *GoogleSheetsDataSource) postCreate() {
 
 func (ds *GoogleSheetsDataSource) getClient() *http.Client {
 	if ds.httpClient == nil {
-		jwtConfig := &jwt.Config{
-			Email:      ds.config.Auth.ServiceAccountMail,
-			PrivateKey: ds.config.Auth.ServiceAccountKey,
-			TokenURL:   google.JWTTokenURL,
-			Scopes: []string{
-				drive.DriveMetadataReadonlyScope,
-				sheets.SpreadsheetsReadonlyScope,
-			},
-		}
+		if ds.config.UseServiceAccount() {
+			jwtConfig := &jwt.Config{
+				Email:      ds.config.Auth.ServiceAccountMail,
+				PrivateKey: ds.config.Auth.ServiceAccountKey,
+				TokenURL:   google.JWTTokenURL,
+				Scopes:     ds.apiScopes(),
+			}
 
-		keyId := ds.config.Auth.ServiceAccountKeyId
-		if len(keyId) > 0 {
-			jwtConfig.PrivateKeyID = keyId
-		}
+			keyId := ds.config.Auth.ServiceAccountKeyId
+			if len(keyId) > 0 {
+				jwtConfig.PrivateKeyID = keyId
+			}
 
-		ds.httpClient = jwtConfig.Client(context.Background())
+			ds.httpClient = jwtConfig.Client(context.Background())
+		} else {
+			ds.httpClient = &http.Client{}
+		}
 	}
 
 	return ds.httpClient
 }
 
+func (ds *GoogleSheetsDataSource) serviceClientOpts() []option.ClientOption {
+	var opts []option.ClientOption
+
+	if ds.config.UseServiceAccount() {
+		opts = append(opts, option.WithHTTPClient(ds.getClient()))
+	} else {
+		opts = append(opts,
+			option.WithAPIKey(os.Getenv(prefixedEnvVar("API_KEY"))),
+			option.WithScopes(ds.apiScopes()...),
+		)
+	}
+
+	return opts
+}
+
 func (ds *GoogleSheetsDataSource) DriveService() *drive.Service {
 	if ds.driveService == nil {
-		newService, err := drive.NewService(context.Background(), option.WithHTTPClient(ds.getClient()))
+		newService, err := drive.NewService(context.Background(), ds.serviceClientOpts()...)
 		if err != nil {
 			logger.Panicf("Could not create drive service: %v", err)
 		} else {
@@ -179,7 +216,7 @@ func (ds *GoogleSheetsDataSource) DriveService() *drive.Service {
 
 func (ds *GoogleSheetsDataSource) SheetsService() *sheets.Service {
 	if ds.sheetsService == nil {
-		newService, err := sheets.NewService(context.Background(), option.WithHTTPClient(ds.getClient()))
+		newService, err := sheets.NewService(context.Background(), ds.serviceClientOpts()...)
 		if err != nil {
 			logger.Panicf("Could not create sheets service: %v", err)
 		} else {
