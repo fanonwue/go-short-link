@@ -62,7 +62,7 @@ type (
 		Mapping       RedirectMap `json:"mapping"`
 		SpreadsheetId string      `json:"spreadsheetId"`
 		LastUpdate    *time.Time  `json:"lastUpdate"`
-		LastModified  *time.Time  `json:"LastModified"`
+		LastModified  *time.Time  `json:"lastModified"`
 	}
 
 	FallbackFileEntry struct {
