@@ -306,7 +306,7 @@ func statusResponse(w http.ResponseWriter, r *http.Request, body any) error {
 		return err
 	}
 
-	h.Set("Content-Type", "application/json")
+	h.Set("Content-Type", "application/json; charset=utf-8")
 	h.Set("Content-Length", strconv.Itoa(buf.Len()))
 
 	if !noBodyRequest(r) {
