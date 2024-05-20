@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	requestTimeout = 5 * time.Second
+	requestTimeout = 10 * time.Second
 	statusEndpoint = "/_status"
 )
 
@@ -95,7 +95,7 @@ func CreateHttpServer(shutdown chan<- error) *http.Server {
 		Handler:      mux,
 		ReadTimeout:  requestTimeout,
 		WriteTimeout: requestTimeout,
-		IdleTimeout:  10 * time.Second,
+		IdleTimeout:  requestTimeout * 2,
 	}
 
 	go func() {
