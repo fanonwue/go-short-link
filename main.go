@@ -53,6 +53,15 @@ type (
 		Target       string
 	}
 
+	ParsedRequest struct {
+		Original       *http.Request
+		Target         string
+		NormalizedPath string
+		Found          bool
+		InfoRequest    bool
+		NoBodyRequest  bool
+	}
+
 	StatusHealthcheck struct {
 		MappingSize int  `json:"mappingSize"`
 		Running     bool `json:"running"`
@@ -261,18 +270,17 @@ func SetupLogging() {
 
 func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
-	redirectTarget, found, infoRequest := RedirectTargetForRequest(r)
-	if !found {
-		NotFoundHandler(w, r, r.URL.Path)
-	} else if infoRequest && redirectInfoEndpointEnabled() {
-		RedirectInfoHandler(w, r, r.URL.Path, redirectTarget)
+	pr := RedirectTargetForRequest(r)
+	if !pr.Found {
+		NotFoundHandler(w, &pr)
+	} else if pr.InfoRequest && redirectInfoEndpointEnabled() {
+		RedirectInfoHandler(w, &pr)
 	} else {
 		responseHeader := w.Header()
 		AddDefaultHeadersWithCache(responseHeader)
 
 		if appConfig.UseETag {
-			requestPath, _ := normalizeRedirectPath(r.URL.Path)
-			etagData := redirectEtag(requestPath, redirectTarget, "redirect")
+			etagData := redirectEtag(pr.NormalizedPath, pr.Target, "redirect")
 			responseHeader.Set("ETag", etagFromData(etagData))
 		}
 
@@ -280,7 +288,7 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 			responseHeader["Content-Type"] = nil
 		}
 
-		http.Redirect(w, r, redirectTarget, http.StatusTemporaryRedirect)
+		http.Redirect(w, r, pr.Target, http.StatusTemporaryRedirect)
 	}
 	if logResponseTimes {
 		endTime := time.Now()
@@ -346,7 +354,11 @@ func StatusInfoHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func RedirectTargetForRequest(r *http.Request) (string, bool, bool) {
+func RedirectTargetForRequest(r *http.Request) ParsedRequest {
+	pr := ParsedRequest{
+		Original: r,
+	}
+
 	normalizedPath, infoRequest := normalizeRedirectPath(r.URL.Path)
 
 	pathEmpty := len(normalizedPath) == 0
@@ -359,7 +371,7 @@ func RedirectTargetForRequest(r *http.Request) (string, bool, bool) {
 	target, found := redirectState.GetTarget(normalizedPath)
 
 	// Assume it's a domain alias when the target does not start with "http"
-	if !strings.HasPrefix(target, "http") {
+	if found && !strings.HasPrefix(target, "http") {
 		normalizedPath, _ = normalizeRedirectPath(target)
 		target, found = redirectState.GetTarget(target)
 	}
@@ -374,7 +386,13 @@ func RedirectTargetForRequest(r *http.Request) (string, bool, bool) {
 		target, found = redirectState.GetTarget(rootRedirectPath)
 	}
 
-	return target, found, infoRequest
+	pr.NormalizedPath = normalizedPath
+	pr.InfoRequest = infoRequest
+	pr.Found = found
+	pr.Target = target
+	pr.NoBodyRequest = noBodyRequest(r)
+
+	return pr
 }
 
 func normalizeRedirectPath(path string) (string, bool) {
@@ -389,54 +407,48 @@ func normalizeRedirectPath(path string) (string, bool) {
 	return path, infoRequest
 }
 
-func normalizeRedirectPathKeepLeadingSlash(path string) (string, bool) {
-	normalizedPath, infoRequest := normalizeRedirectPath(path)
-	if strings.HasPrefix(path, "/") {
-		normalizedPath = "/" + normalizedPath
+func addLeadingSlash(s string) string {
+	if !strings.HasPrefix(s, "/") {
+		s = "/" + s
 	}
-	return normalizedPath, infoRequest
+	return s
 }
 
-func RedirectInfoHandler(w http.ResponseWriter, r *http.Request, requestPath string, target string) {
+func RedirectInfoHandler(w http.ResponseWriter, pr *ParsedRequest) {
 	renderedBuf := new(bytes.Buffer)
 	renderedBuf.Grow(2048)
 
-	requestPath, _ = normalizeRedirectPathKeepLeadingSlash(requestPath)
-
 	err := redirectInfoTemplate.Execute(renderedBuf, &RedirectInfoTemplateData{
-		RedirectName: requestPath,
-		Target:       target,
+		RedirectName: addLeadingSlash(pr.NormalizedPath),
+		Target:       pr.Target,
 	})
 
 	if err != nil {
 		logger.Errorf("Could not render redirect-info template: %v", err)
 	}
 
-	etagData := redirectEtag(requestPath, target, "info")
+	etagData := redirectEtag(pr.NormalizedPath, pr.Target, "info")
 
-	htmlResponse(w, r, http.StatusOK, renderedBuf, etagData)
+	htmlResponse(w, pr, http.StatusOK, renderedBuf, etagData)
 }
 
-func NotFoundHandler(w http.ResponseWriter, r *http.Request, requestPath string) {
+func NotFoundHandler(w http.ResponseWriter, pr *ParsedRequest) {
 	renderedBuf := new(bytes.Buffer)
-
 	// Pre initialize to 2KiB, as the response will be bigger than 1KiB due to the size of the template
 	renderedBuf.Grow(2048)
 
-	requestPath, _ = normalizeRedirectPathKeepLeadingSlash(requestPath)
-
 	err := notFoundTemplate.Execute(renderedBuf, &NotFoundTemplateData{
-		RedirectName: requestPath,
+		RedirectName: addLeadingSlash(pr.NormalizedPath),
 	})
 
 	if err != nil {
 		logger.Errorf("Could not render not-found template: %v", err)
 	}
 
-	htmlResponse(w, r, http.StatusNotFound, renderedBuf, "")
+	htmlResponse(w, pr, http.StatusNotFound, renderedBuf, "")
 }
 
-func htmlResponse(w http.ResponseWriter, r *http.Request, status int, buffer *bytes.Buffer, etagData string) {
+func htmlResponse(w http.ResponseWriter, pr *ParsedRequest, status int, buffer *bytes.Buffer, etagData string) {
 	responseHeader := w.Header()
 
 	AddDefaultHeadersWithCache(responseHeader)
@@ -450,7 +462,7 @@ func htmlResponse(w http.ResponseWriter, r *http.Request, status int, buffer *by
 
 	w.WriteHeader(status)
 
-	if !noBodyRequest(r) {
+	if !pr.NoBodyRequest {
 		_, err := buffer.WriteTo(w)
 		if err != nil {
 			logger.Errorf("Could not write response body: %v", err)
