@@ -65,6 +65,7 @@ type (
 	StatusHealthcheck struct {
 		MappingSize int  `json:"mappingSize"`
 		Running     bool `json:"running"`
+		Healthy     bool `json:"healthy"`
 	}
 
 	StatusInfo struct {
@@ -72,6 +73,7 @@ type (
 		SpreadsheetId string      `json:"spreadsheetId"`
 		LastUpdate    *time.Time  `json:"lastUpdate"`
 		LastModified  *time.Time  `json:"lastModified"`
+		LastError     string      `json:"lastError,omitempty"`
 	}
 
 	FallbackFileEntry struct {
@@ -234,9 +236,10 @@ func Setup() {
 	addDefaultRedirectMapHooks()
 
 	targetChannel := redirectState.ListenForUpdates()
+	errorChannel := redirectState.ListenForUpdateErrors()
 
-	UpdateRedirectMapping(targetChannel, true)
-	go StartBackgroundUpdates(targetChannel, quitUpdateJob)
+	UpdateRedirectMapping(targetChannel, errorChannel, true)
+	go StartBackgroundUpdates(targetChannel, errorChannel, quitUpdateJob)
 }
 
 func SetupEnvironment() {
@@ -308,7 +311,7 @@ func OptionsHandler(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func statusResponse(w http.ResponseWriter, r *http.Request, body any) error {
+func statusResponse(w http.ResponseWriter, r *http.Request, body any, status int) error {
 	var buf bytes.Buffer
 	h := w.Header()
 	AddDefaultHeaders(h)
@@ -324,6 +327,8 @@ func statusResponse(w http.ResponseWriter, r *http.Request, body any) error {
 	h.Set("Content-Type", "application/json; charset=utf-8")
 	h.Set("Content-Length", strconv.Itoa(buf.Len()))
 
+	w.WriteHeader(status)
+
 	if !noBodyRequest(r) {
 		_, err = buf.WriteTo(w)
 		if err != nil {
@@ -335,10 +340,18 @@ func statusResponse(w http.ResponseWriter, r *http.Request, body any) error {
 }
 
 func StatusHealthHandler(w http.ResponseWriter, r *http.Request) {
+	status := http.StatusOK
+
+	healthy := redirectState.LastError() == nil
+	if !healthy {
+		status = http.StatusInternalServerError
+	}
+
 	_ = statusResponse(w, r, StatusHealthcheck{
 		MappingSize: redirectState.MappingSize(),
-		Running:     true,
-	})
+		Running:     server != nil,
+		Healthy:     healthy,
+	}, status)
 }
 
 func StatusInfoHandler(w http.ResponseWriter, r *http.Request) {
@@ -346,12 +359,19 @@ func StatusInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	lastError := redirectState.LastError()
+	errorString := ""
+	if lastError != nil {
+		errorString = lastError.Error()
+	}
+
 	_ = statusResponse(w, r, StatusInfo{
 		Mapping:       redirectState.CurrentMapping(),
 		SpreadsheetId: ds.Id(),
 		LastUpdate:    ds.LastUpdate(),
 		LastModified:  ds.LastModified(),
-	})
+		LastError:     errorString,
+	}, http.StatusOK)
 }
 
 func RedirectTargetForRequest(r *http.Request) ParsedRequest {
@@ -479,7 +499,7 @@ func etagFromData(data string) string {
 	return "\"" + hex.EncodeToString(hash[:etagLength]) + "\""
 }
 
-func StartBackgroundUpdates(targetChannel chan<- RedirectMap, quitChannel <-chan bool) {
+func StartBackgroundUpdates(targetChannel chan<- RedirectMap, lastErrorChannel chan<- error, quitChannel <-chan bool) {
 	logger.Infof("Starting background updates at an interval of %d seconds", appConfig.UpdatePeriod)
 	for {
 		time.Sleep(time.Duration(appConfig.UpdatePeriod) * time.Second)
@@ -489,19 +509,20 @@ func StartBackgroundUpdates(targetChannel chan<- RedirectMap, quitChannel <-chan
 			logger.Info("Received quit signal on update job")
 			return
 		default:
-			UpdateRedirectMapping(targetChannel, false)
+			UpdateRedirectMapping(targetChannel, lastErrorChannel, false)
 		}
 	}
 }
 
-func UpdateRedirectMapping(target chan<- RedirectMap, force bool) {
-	if !force && !ds.NeedsUpdate() {
+func UpdateRedirectMapping(target chan<- RedirectMap, lastError chan<- error, force bool) {
+	if !force && !ds.NeedsUpdate() && redirectState.LastError() == nil {
 		logger.Debugf("File has not changed since last update, skipping update")
 		return
 	}
 
 	fetchedMapping, fetchErr := ds.FetchRedirectMapping()
 	if fetchErr != nil {
+		lastError <- fetchErr
 		logger.Warnf("Error fetching new redirect mapping: %v", fetchErr)
 		if appConfig.UseFallbackFile() {
 			fallbackMap, err := readFallbackFile(appConfig.FallbackFile)
@@ -515,6 +536,8 @@ func UpdateRedirectMapping(target chan<- RedirectMap, force bool) {
 			logger.Warnf("Fallback file disabled")
 			return
 		}
+	} else {
+		lastError <- nil
 	}
 
 	var newMap = fetchedMapping
