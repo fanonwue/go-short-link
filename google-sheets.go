@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -31,12 +32,14 @@ type GoogleSheetsConfig struct {
 }
 
 type GoogleSheetsDataSource struct {
-	lastUpdate    *time.Time
-	lastModified  *time.Time
-	config        GoogleSheetsConfig
-	httpClient    *http.Client
-	sheetsService *sheets.Service
-	driveService  *drive.Service
+	lastUpdate        *time.Time
+	lastUpdateMutex   sync.RWMutex
+	lastModified      *time.Time
+	lastModifiedMutex sync.RWMutex
+	config            GoogleSheetsConfig
+	httpClient        *http.Client
+	sheetsService     *sheets.Service
+	driveService      *drive.Service
 }
 
 const (
@@ -235,6 +238,8 @@ func (ds *GoogleSheetsDataSource) Id() string {
 }
 
 func (ds *GoogleSheetsDataSource) LastUpdate() *time.Time {
+	ds.lastUpdateMutex.RLock()
+	defer ds.lastUpdateMutex.RUnlock()
 	return ds.lastUpdate
 }
 
@@ -249,6 +254,8 @@ func (ds *GoogleSheetsDataSource) SpreadsheetWebLink() (string, error) {
 }
 
 func (ds *GoogleSheetsDataSource) updateLastUpdate(updateTime *time.Time) *time.Time {
+	ds.lastUpdateMutex.Lock()
+	defer ds.lastUpdateMutex.Unlock()
 	if updateTime == nil {
 		now := time.Now()
 		updateTime = &now
@@ -260,6 +267,8 @@ func (ds *GoogleSheetsDataSource) updateLastUpdate(updateTime *time.Time) *time.
 }
 
 func (ds *GoogleSheetsDataSource) updateLastModified() (*time.Time, error) {
+	ds.lastModifiedMutex.Lock()
+	defer ds.lastModifiedMutex.Unlock()
 	service := ds.DriveService()
 	file, err := service.Files.Get(ds.config.SpreadsheetId).Fields("modifiedTime").Do()
 	if err != nil {
@@ -280,11 +289,15 @@ func (ds *GoogleSheetsDataSource) updateLastModified() (*time.Time, error) {
 }
 
 func (ds *GoogleSheetsDataSource) LastModified() *time.Time {
+	ds.lastModifiedMutex.RLock()
 	if ds.lastModified == nil {
+		// Release read lock to allow upgrade to a write lock
+		ds.lastModifiedMutex.RUnlock()
 		modified, _ := ds.updateLastModified()
 		return modified
 	}
 
+	defer ds.lastModifiedMutex.RUnlock()
 	return ds.lastModified
 }
 
