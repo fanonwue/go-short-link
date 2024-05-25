@@ -301,7 +301,7 @@ func (ds *GoogleSheetsDataSource) NeedsUpdate() bool {
 	return modifiedTime.After(*ds.lastUpdate)
 }
 
-func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (RedirectMap, error) {
+func (ds *GoogleSheetsDataSource) fetchRedirectMappingInternal() (RedirectMap, *time.Time, error) {
 	service := ds.SheetsService()
 
 	sheetsRange := "A2:C"
@@ -310,7 +310,8 @@ func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (RedirectMap, error) {
 	}
 
 	mapping := RedirectMap{}
-	updateTime := time.Now().UTC()
+	updateTimeTmp := time.Now().UTC()
+	updateTime := &updateTimeTmp
 
 	result, err := service.Spreadsheets.Values.Get(ds.config.SpreadsheetId, sheetsRange).
 		ValueRenderOption("UNFORMATTED_VALUE").
@@ -318,13 +319,11 @@ func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (RedirectMap, error) {
 
 	if err != nil {
 		logger.Errorf("Unable to retrieve data from sheet: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
 
-	ds.updateLastUpdate(&updateTime)
-
 	if len(result.Values) == 0 {
-		return mapping, nil
+		return mapping, updateTime, nil
 	}
 
 	for _, row := range result.Values {
@@ -372,5 +371,15 @@ func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (RedirectMap, error) {
 		mapping[key] = value
 	}
 
-	return mapping, nil
+	return mapping, updateTime, nil
+}
+
+func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (RedirectMap, error) {
+	mapping, updateTime, err := ds.fetchRedirectMappingInternal()
+
+	if err == nil {
+		ds.updateLastUpdate(updateTime)
+	}
+
+	return mapping, err
 }
