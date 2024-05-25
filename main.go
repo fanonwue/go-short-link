@@ -231,18 +231,15 @@ func Setup() {
 		faviconTemplateString = fmt.Sprintf("{{define \"icon\"}}%s{{end}}", appConfig.Favicon)
 	}
 
+	if len(faviconTemplateString) > 0 {
+		baseTemplate = template.Must(baseTemplate.Parse(faviconTemplateString))
+	}
+
 	notFoundTemplate = template.Must(createTemplate(baseTemplate, notFoundTemplatePath))
 
 	redirectInfoTemplate, err = createTemplate(baseTemplate, redirectInfoTemplatePath)
 	if err != nil {
 		logger.Warnf("Could not load redirect-info template file %s: %v", redirectInfoTemplatePath, err)
-	}
-
-	if len(faviconTemplateString) > 0 {
-		notFoundTemplate = template.Must(notFoundTemplate.Parse(faviconTemplateString))
-		if redirectInfoTemplate != nil {
-			redirectInfoTemplate = template.Must(redirectInfoTemplate.Parse(faviconTemplateString))
-		}
 	}
 
 	if appConfig.UseFallbackFile() {
