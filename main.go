@@ -72,6 +72,7 @@ type (
 )
 
 const (
+	logResponseTimes           = false
 	serverIdentifierHeader     = "go-short-link"
 	cacheControlHeaderTemplate = "public, max-age=%d"
 	defaultUpdatePeriod        = 300
@@ -259,6 +260,7 @@ func SetupLogging() {
 }
 
 func ServerHandler(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
 	redirectTarget, found, infoRequest := RedirectTargetForRequest(r)
 	if !found {
 		NotFoundHandler(w, r, r.URL.Path)
@@ -279,6 +281,11 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		http.Redirect(w, r, redirectTarget, http.StatusTemporaryRedirect)
+	}
+	if logResponseTimes {
+		endTime := time.Now()
+		duration := endTime.Sub(startTime)
+		logger.Debugf("Request evaluation took %dµs", duration.Microseconds())
 	}
 }
 
