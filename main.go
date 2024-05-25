@@ -468,6 +468,7 @@ func RedirectInfoHandler(w http.ResponseWriter, pr *ParsedRequest) {
 
 func NotFoundHandler(w http.ResponseWriter, pr *ParsedRequest) {
 	if strings.HasPrefix(pr.NormalizedPath, "favicon.") {
+		AddDefaultHeaders(w.Header())
 		w.WriteHeader(404)
 		return
 	}
