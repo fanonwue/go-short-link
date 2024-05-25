@@ -42,6 +42,7 @@ type (
 		Favicon               string
 		AllowRootRedirect     bool
 		FallbackFile          string
+		ShowRepositoryLink    bool
 	}
 
 	NotFoundTemplateData struct {
@@ -151,6 +152,7 @@ func CreateAppConfig() *AppConfig {
 		UseETag:               boolConfig(prefixedEnvVar("ENABLE_ETAG"), true),
 		UseRedirectBody:       boolConfig(prefixedEnvVar("ENABLE_REDIRECT_BODY"), true),
 		AllowRootRedirect:     boolConfig(prefixedEnvVar("ALLOW_ROOT_REDIRECT"), true),
+		ShowRepositoryLink:    boolConfig(prefixedEnvVar("SHOW_REPOSITORY_LINK"), false),
 		Favicon:               os.Getenv(prefixedEnvVar("FAVICON")),
 		FallbackFile:          os.Getenv(prefixedEnvVar("FALLBACK_FILE")),
 	}
@@ -205,8 +207,21 @@ func Setup() {
 	ds = CreateSheetsDataSource()
 
 	var err error
+
+	templateFuncs := template.FuncMap{
+		"showRepositoryLink": func() bool { return appConfig.ShowRepositoryLink },
+		"showServerName":     func() bool { return appConfig.ShowServerHeader },
+		"serverName":         func() string { return strings.ToUpper(serverIdentifierHeader) },
+		"now":                time.Now,
+		"nowFormatted":       func() string { return time.Now().UTC().Format(time.RFC3339) },
+		"lastUpdate":         func() string { return ds.LastUpdate().Format(time.RFC3339) },
+	}
+
 	resourcePath := "./resources"
-	baseTemplate := template.Must(template.ParseFiles(path.Join(resourcePath, "base.gohtml")))
+	baseTemplateName := "base.gohtml"
+	baseTemplate := template.Must(
+		template.New(baseTemplateName).Funcs(templateFuncs).ParseFiles(path.Join(resourcePath, baseTemplateName)),
+	)
 	notFoundTemplatePath := path.Join(resourcePath, "not-found.gohtml")
 	redirectInfoTemplatePath := path.Join(resourcePath, "redirect-info.gohtml")
 

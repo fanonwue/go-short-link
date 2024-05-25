@@ -6,6 +6,7 @@
 </head>
 <body>
 {{template "body" .}}
+{{template "footer"}}
 </body>
 </html>
 
@@ -34,13 +35,22 @@
             overflow-wrap: break-word;
         }
 
-        .link a {
+        a {
             color: inherit;
             text-decoration: none;
         }
 
         .bold {
             font-weight: bold;
+        }
+
+        #footer {
+            max-width: 30em;
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            font-size: .8em;
+            margin-top: 3em;
         }
 
         @media (prefers-color-scheme: dark) {
@@ -51,4 +61,25 @@
         }
     </style>
     <link rel="icon" href="{{block "icon" .}}data:;base64,={{end}}">
+{{end}}
+
+{{define "footer"}}
+    <footer id="footer">
+        <hr>
+        <p>
+            Page rendered at: {{nowFormatted}}<br>
+            Last mapping update: {{lastUpdate}}
+        </p>
+        <p>
+        {{if showServerName}}
+            {{if showRepositoryLink}}
+                <a class="bold link" href="https://github.com/fanonwue/go-short-link">{{serverName}}</a>
+            {{else}}
+                <span class="bold">{{serverName}}</span>
+            {{end}}
+            <br>
+        {{end}}
+            © 2023-{{now.UTC.Year}} ZenDrake
+        </p>
+    </footer>
 {{end}}
