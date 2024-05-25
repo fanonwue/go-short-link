@@ -467,6 +467,11 @@ func RedirectInfoHandler(w http.ResponseWriter, pr *ParsedRequest) {
 }
 
 func NotFoundHandler(w http.ResponseWriter, pr *ParsedRequest) {
+	if strings.HasPrefix(pr.NormalizedPath, "favicon.") {
+		w.WriteHeader(404)
+		return
+	}
+
 	renderedBuf := new(bytes.Buffer)
 	// Pre initialize to 2KiB, as the response will be bigger than 1KiB due to the size of the template
 	renderedBuf.Grow(2048)
