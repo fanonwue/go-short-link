@@ -64,9 +64,10 @@ type (
 	}
 
 	StatusHealthcheck struct {
-		MappingSize int  `json:"mappingSize"`
-		Running     bool `json:"running"`
-		Healthy     bool `json:"healthy"`
+		MappingSize int        `json:"mappingSize"`
+		Running     bool       `json:"running"`
+		Healthy     bool       `json:"healthy"`
+		LastUpdate  *time.Time `json:"lastUpdate"`
 	}
 
 	StatusInfo struct {
@@ -366,6 +367,7 @@ func StatusHealthHandler(w http.ResponseWriter, r *http.Request) {
 		MappingSize: redirectState.MappingSize(),
 		Running:     server != nil,
 		Healthy:     healthy,
+		LastUpdate:  ds.LastUpdate(),
 	}, status)
 }
 
