@@ -67,8 +67,8 @@
     <footer id="footer">
         <hr>
         <p>
-            Page rendered at: {{nowFormatted}}<br>
-            Last mapping update: {{lastUpdate}}
+            Page rendered at: <span id="render-time" class="timestamp">{{nowFormatted}}</span><br>
+            Last mapping update: <span id="update-time" class="timestamp">{{lastUpdate}}</span>
         </p>
         <p>
         {{if showServerName}}
@@ -81,5 +81,25 @@
         {{end}}
             © 2023-{{now.UTC.Year}} ZenDrake
         </p>
+        <script type="text/javascript">
+            "use strict";
+
+            function utcToLocal(timestampString) {
+                return new Date(timestampString).toLocaleString(undefined, {
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    timeZoneName: "short"
+                })
+            }
+
+            document.querySelectorAll(".timestamp").forEach(el => {
+                el.innerText = utcToLocal(el.innerText)
+            })
+
+        </script>
     </footer>
 {{end}}
