@@ -287,6 +287,7 @@ func (ds *GoogleSheetsDataSource) updateLastModified() (*time.Time, error) {
 
 	modifiedTimeUtc := modifiedTime.UTC()
 	ds.lastModified = &modifiedTimeUtc
+	util.Logger().Debugf("Updated last modified time to %v", modifiedTimeUtc)
 	return ds.lastModified, nil
 }
 
