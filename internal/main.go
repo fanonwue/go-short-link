@@ -446,7 +446,7 @@ func addLeadingSlash(s string) string {
 
 func RedirectInfoHandler(w http.ResponseWriter, pr *ParsedRequest) {
 	renderedBuf := new(bytes.Buffer)
-	renderedBuf.Grow(2048)
+	renderedBuf.Grow(4096)
 
 	err := redirectInfoTemplate.Execute(renderedBuf, &RedirectInfoTemplateData{
 		RedirectName: addLeadingSlash(pr.NormalizedPath),
@@ -470,8 +470,8 @@ func NotFoundHandler(w http.ResponseWriter, pr *ParsedRequest) {
 	}
 
 	renderedBuf := new(bytes.Buffer)
-	// Pre initialize to 2KiB, as the response will be bigger than 1KiB due to the size of the template
-	renderedBuf.Grow(2048)
+	// Pre initialize to 4KiB, as the response will be bigger than 1KiB due to the size of the template
+	renderedBuf.Grow(4096)
 
 	err := notFoundTemplate.Execute(renderedBuf, &NotFoundTemplateData{
 		RedirectName: addLeadingSlash(pr.NormalizedPath),
