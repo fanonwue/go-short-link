@@ -96,6 +96,7 @@ const (
 	infoRequestIdentifier      = "+"
 	etagLength                 = 8
 	rootRedirectPath           = "__root"
+	defaultBufferSize          = 4096
 )
 
 var (
@@ -445,8 +446,8 @@ func addLeadingSlash(s string) string {
 }
 
 func RedirectInfoHandler(w http.ResponseWriter, pr *ParsedRequest) {
-	renderedBuf := new(bytes.Buffer)
-	renderedBuf.Grow(4096)
+	// Pre initialize to the specified buffer size, as the response will be bigger than 1KiB due to the size of the template
+	renderedBuf := util.NewBuffer(defaultBufferSize)
 
 	err := redirectInfoTemplate.Execute(renderedBuf, &RedirectInfoTemplateData{
 		RedirectName: addLeadingSlash(pr.NormalizedPath),
@@ -469,9 +470,8 @@ func NotFoundHandler(w http.ResponseWriter, pr *ParsedRequest) {
 		return
 	}
 
-	renderedBuf := new(bytes.Buffer)
-	// Pre initialize to 4KiB, as the response will be bigger than 1KiB due to the size of the template
-	renderedBuf.Grow(4096)
+	// Pre initialize to the specified buffer size, as the response will be bigger than 1KiB due to the size of the template
+	renderedBuf := util.NewBuffer(defaultBufferSize)
 
 	err := notFoundTemplate.Execute(renderedBuf, &NotFoundTemplateData{
 		RedirectName: addLeadingSlash(pr.NormalizedPath),

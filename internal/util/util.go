@@ -1,6 +1,9 @@
 package util
 
-import "go.uber.org/zap"
+import (
+	"bytes"
+	"go.uber.org/zap"
+)
 
 const (
 	envVarPrefix = "APP_"
@@ -24,4 +27,8 @@ func Logger() *zap.SugaredLogger {
 
 func PrefixedEnvVar(envVar string) string {
 	return envVarPrefix + envVar
+}
+
+func NewBuffer(cap int) *bytes.Buffer {
+	return bytes.NewBuffer(make([]byte, 0, cap))
 }
