@@ -1,10 +1,11 @@
-package main
+package internal
 
 import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"github.com/fanonwue/go-short-link/internal/util"
 	"net/http"
 	"slices"
 	"time"
@@ -78,7 +79,7 @@ func wrapHandlerTimeout(handlerFunc func(http.ResponseWriter, *http.Request)) ht
 }
 
 func CreateHttpServer(shutdown chan<- error) *http.Server {
-	logger.Infof("Starting HTTP server on port %d", appConfig.Port)
+	util.Logger().Infof("Starting HTTP server on port %d", appConfig.Port)
 
 	mux := http.NewServeMux()
 
@@ -100,9 +101,9 @@ func CreateHttpServer(shutdown chan<- error) *http.Server {
 
 	go func() {
 		err := srv.ListenAndServe()
-		logger.Debugf("HTTP Server closed")
+		util.Logger().Debugf("HTTP Server closed")
 		if !errors.Is(err, http.ErrServerClosed) {
-			logger.Errorf("Error creating server: %v", err)
+			util.Logger().Errorf("Error creating server: %v", err)
 			shutdown <- err
 		} else {
 			shutdown <- nil

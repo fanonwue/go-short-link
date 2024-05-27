@@ -1,6 +1,7 @@
-package main
+package ds
 
 import (
+	"github.com/fanonwue/go-short-link/internal/state"
 	"time"
 )
 
@@ -12,7 +13,7 @@ type RedirectDataSource interface {
 	// NeedsUpdate returns true when the data source provider determined that an update of the redirect mapping is necessary
 	NeedsUpdate() bool
 	// FetchRedirectMapping returns the current redirect mapping from the provider
-	FetchRedirectMapping() (RedirectMap, error)
+	FetchRedirectMapping() (state.RedirectMap, error)
 	// Id returns a provider specific identifier
 	Id() string
 }

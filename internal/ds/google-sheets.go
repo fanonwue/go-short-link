@@ -1,8 +1,10 @@
-package main
+package ds
 
 import (
 	"bytes"
 	"context"
+	"github.com/fanonwue/go-short-link/internal/state"
+	"github.com/fanonwue/go-short-link/internal/util"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
 	"google.golang.org/api/drive/v3"
@@ -53,18 +55,18 @@ const (
 
 func createSheetsConfig() GoogleSheetsConfig {
 	config := GoogleSheetsConfig{
-		SpreadsheetId: os.Getenv(prefixedEnvVar("SPREADSHEET_ID")),
+		SpreadsheetId: os.Getenv(util.PrefixedEnvVar("SPREADSHEET_ID")),
 		SkipFirstRow:  true,
 	}
 
-	apiKey := os.Getenv(prefixedEnvVar("API_KEY"))
+	apiKey := os.Getenv(util.PrefixedEnvVar("API_KEY"))
 
 	if len(apiKey) == 0 {
 		auth := GoogleAuthConfig{
-			ProjectId:           os.Getenv(prefixedEnvVar("PROJECT_ID")),
-			ServiceAccountMail:  os.Getenv(prefixedEnvVar("SERVICE_ACCOUNT_CLIENT_EMAIL")),
+			ProjectId:           os.Getenv(util.PrefixedEnvVar("PROJECT_ID")),
+			ServiceAccountMail:  os.Getenv(util.PrefixedEnvVar("SERVICE_ACCOUNT_CLIENT_EMAIL")),
 			ServiceAccountKey:   getServiceAccountPrivateKey(),
-			ServiceAccountKeyId: os.Getenv(prefixedEnvVar("SERVICE_ACCOUNT_PRIVATE_KEY_ID")),
+			ServiceAccountKeyId: os.Getenv(util.PrefixedEnvVar("SERVICE_ACCOUNT_PRIVATE_KEY_ID")),
 		}
 		config.Auth = &auth
 	} else {
@@ -79,24 +81,24 @@ func getServiceAccountPrivateKey() []byte {
 	var keyData = readPrivateKeyData(true)
 
 	if len(keyData) < 100 {
-		logger.Warnf("Keyfile smaller than 100 Bytes! This is probably unintended. Length: %d", len(keyData))
+		util.Logger().Warnf("Keyfile smaller than 100 Bytes! This is probably unintended. Length: %d", len(keyData))
 	}
 
 	if validateKeyContent {
-		logger.Info("Key validation enabled, performing checks")
+		util.Logger().Info("Key validation enabled, performing checks")
 		keyString := string(keyData)
 
 		keyPrefix := "-----BEGIN PRIVATE KEY-----"
 		if !strings.HasPrefix(keyString, keyPrefix) {
-			logger.Panicf("Key does not start with expected prefix: %s", keyPrefix)
+			util.Logger().Panicf("Key does not start with expected prefix: %s", keyPrefix)
 		}
 
 		keySuffix := "-----END PRIVATE KEY-----"
 		if !strings.HasSuffix(keyString, keySuffix) {
-			logger.Panicf("Key does not end with expected suffix: %s", keySuffix)
+			util.Logger().Panicf("Key does not end with expected suffix: %s", keySuffix)
 		}
 	} else {
-		logger.Info("Key validation disabled, skipping checks")
+		util.Logger().Info("Key validation disabled, skipping checks")
 	}
 
 	return keyData
@@ -104,29 +106,29 @@ func getServiceAccountPrivateKey() []byte {
 
 func readPrivateKeyData(trimWhitespace bool) []byte {
 	var keyData []byte
-	rawKey := os.Getenv(prefixedEnvVar("SERVICE_ACCOUNT_PRIVATE_KEY"))
+	rawKey := os.Getenv(util.PrefixedEnvVar("SERVICE_ACCOUNT_PRIVATE_KEY"))
 	if len(rawKey) > 0 {
 		key := strings.Replace(rawKey, "\\n", "\n", -1)
 		keyData = []byte(key)
 	} else {
-		keyFile := os.Getenv(prefixedEnvVar("SERVICE_ACCOUNT_PRIVATE_KEY_FILE"))
+		keyFile := os.Getenv(util.PrefixedEnvVar("SERVICE_ACCOUNT_PRIVATE_KEY_FILE"))
 		if len(keyFile) == 0 {
 			// Assume standard keyfile location
-			logger.Debugf("Keyfile location not set, assuming default location: %s", defaultKeyFilePath)
+			util.Logger().Debugf("Keyfile location not set, assuming default location: %s", defaultKeyFilePath)
 			keyFile = defaultKeyFilePath
 		}
 
 		keyFile, err := filepath.Abs(keyFile)
 		if err != nil {
-			logger.Panicf("Could not create absolute path from path: %v", err)
+			util.Logger().Panicf("Could not create absolute path from path: %v", err)
 		}
 
-		logger.Infof("Trying to read keyfile from path: %s", keyFile)
+		util.Logger().Infof("Trying to read keyfile from path: %s", keyFile)
 		fileContent, err := os.ReadFile(keyFile)
 		if err != nil {
-			logger.Panicf("Error reading keyfile: %v", err)
+			util.Logger().Panicf("Error reading keyfile: %v", err)
 		}
-		logger.Debugf("Read keyfile, length: %d bytes", len(fileContent))
+		util.Logger().Debugf("Read keyfile, length: %d bytes", len(fileContent))
 
 		keyData = fileContent
 	}
@@ -162,7 +164,7 @@ func (ds *GoogleSheetsDataSource) apiScopes() []string {
 func (ds *GoogleSheetsDataSource) postCreate() {
 	fileWebLink, err := ds.SpreadsheetWebLink()
 	if err == nil {
-		logger.Infof("Using document available at: %s", fileWebLink)
+		util.Logger().Infof("Using document available at: %s", fileWebLink)
 	}
 }
 
@@ -197,7 +199,7 @@ func (ds *GoogleSheetsDataSource) serviceClientOpts() []option.ClientOption {
 		opts = append(opts, option.WithHTTPClient(ds.getClient()))
 	} else {
 		opts = append(opts,
-			option.WithAPIKey(os.Getenv(prefixedEnvVar("API_KEY"))),
+			option.WithAPIKey(os.Getenv(util.PrefixedEnvVar("API_KEY"))),
 			option.WithScopes(ds.apiScopes()...),
 		)
 	}
@@ -209,7 +211,7 @@ func (ds *GoogleSheetsDataSource) DriveService() *drive.Service {
 	if ds.driveService == nil {
 		newService, err := drive.NewService(context.Background(), ds.serviceClientOpts()...)
 		if err != nil {
-			logger.Panicf("Could not create drive service: %v", err)
+			util.Logger().Panicf("Could not create drive service: %v", err)
 		} else {
 			ds.driveService = newService
 		}
@@ -221,7 +223,7 @@ func (ds *GoogleSheetsDataSource) SheetsService() *sheets.Service {
 	if ds.sheetsService == nil {
 		newService, err := sheets.NewService(context.Background(), ds.serviceClientOpts()...)
 		if err != nil {
-			logger.Panicf("Could not create sheets service: %v", err)
+			util.Logger().Panicf("Could not create sheets service: %v", err)
 		} else {
 			ds.sheetsService = newService
 		}
@@ -247,7 +249,7 @@ func (ds *GoogleSheetsDataSource) SpreadsheetWebLink() (string, error) {
 	service := ds.DriveService()
 	file, err := service.Files.Get(ds.config.SpreadsheetId).Fields("webViewLink").Do()
 	if err != nil {
-		logger.Warnf("Could not determine webViewLink for Spreadsheet '%s': %v", ds.config.SpreadsheetId, err)
+		util.Logger().Warnf("Could not determine webViewLink for Spreadsheet '%s': %v", ds.config.SpreadsheetId, err)
 		return "", err
 	}
 	return file.WebViewLink, nil
@@ -272,14 +274,14 @@ func (ds *GoogleSheetsDataSource) updateLastModified() (*time.Time, error) {
 	service := ds.DriveService()
 	file, err := service.Files.Get(ds.config.SpreadsheetId).Fields("modifiedTime").Do()
 	if err != nil {
-		logger.Errorf("Could not determine modifiedTime for Spreadsheet '%s': %v", ds.config.SpreadsheetId, err)
+		util.Logger().Errorf("Could not determine modifiedTime for Spreadsheet '%s': %v", ds.config.SpreadsheetId, err)
 		return nil, err
 	}
 
 	modifiedTimeRaw := file.ModifiedTime
 	modifiedTime, err := time.Parse(time.RFC3339, modifiedTimeRaw)
 	if err != nil {
-		logger.Errorf("Could not parse RFC3339 timestamp %s: %v", modifiedTimeRaw, err)
+		util.Logger().Errorf("Could not parse RFC3339 timestamp %s: %v", modifiedTimeRaw, err)
 		return nil, err
 	}
 
@@ -314,7 +316,7 @@ func (ds *GoogleSheetsDataSource) NeedsUpdate() bool {
 	return modifiedTime.After(*ds.lastUpdate)
 }
 
-func (ds *GoogleSheetsDataSource) fetchRedirectMappingInternal() (RedirectMap, *time.Time, error) {
+func (ds *GoogleSheetsDataSource) fetchRedirectMappingInternal() (state.RedirectMap, *time.Time, error) {
 	service := ds.SheetsService()
 
 	sheetsRange := "A2:C"
@@ -322,7 +324,7 @@ func (ds *GoogleSheetsDataSource) fetchRedirectMappingInternal() (RedirectMap, *
 		sheetsRange = "A:C"
 	}
 
-	mapping := RedirectMap{}
+	mapping := state.RedirectMap{}
 	updateTimeTmp := time.Now().UTC()
 	updateTime := &updateTimeTmp
 
@@ -331,7 +333,7 @@ func (ds *GoogleSheetsDataSource) fetchRedirectMappingInternal() (RedirectMap, *
 		Do()
 
 	if err != nil {
-		logger.Errorf("Unable to retrieve data from sheet: %v", err)
+		util.Logger().Errorf("Unable to retrieve data from sheet: %v", err)
 		return nil, nil, err
 	}
 
@@ -387,7 +389,7 @@ func (ds *GoogleSheetsDataSource) fetchRedirectMappingInternal() (RedirectMap, *
 	return mapping, updateTime, nil
 }
 
-func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (RedirectMap, error) {
+func (ds *GoogleSheetsDataSource) FetchRedirectMapping() (state.RedirectMap, error) {
 	mapping, updateTime, err := ds.fetchRedirectMappingInternal()
 
 	if err == nil {

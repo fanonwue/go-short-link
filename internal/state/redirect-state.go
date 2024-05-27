@@ -1,6 +1,9 @@
-package main
+package state
 
-import "sync"
+import (
+	"github.com/fanonwue/go-short-link/internal/util"
+	"sync"
+)
 
 type (
 	// RedirectMap is a map of string keys and string values. The key is meant to be interpreted as the redirect path,
@@ -22,6 +25,13 @@ type (
 		lastErrorMutex   sync.RWMutex
 	}
 )
+
+func NewState() RedirectMapState {
+	return RedirectMapState{
+		mapping: RedirectMap{},
+		hooks:   make([]RedirectMapHook, 0),
+	}
+}
 
 func (state *RedirectMapState) LastError() error {
 	state.lastErrorMutex.RLock()
@@ -109,11 +119,11 @@ func (state *RedirectMapState) ListenForUpdates() chan<- RedirectMap {
 func (state *RedirectMapState) updateListener() {
 	for mapping := range state.mappingChannel {
 		state.UpdateMapping(mapping)
-		logger.Infof("Updated redirect mapping, number of entries: %d", len(mapping))
+		util.Logger().Infof("Updated redirect mapping, number of entries: %d", len(mapping))
 	}
 
 	// The mappingChannel has been closed at this point, so we need to reflect that in our local state
-	logger.Debugf("Setting redirect state mappingChannel to nil")
+	util.Logger().Debugf("Setting redirect state mappingChannel to nil")
 	state.mappingChannel = nil
 }
 
@@ -122,6 +132,6 @@ func (state *RedirectMapState) errorListener() {
 		state.UpdateLastError(err)
 	}
 
-	logger.Debugf("Setting redirect state errorChannel to nil")
+	util.Logger().Debugf("Setting redirect state errorChannel to nil")
 	state.lastErrorChannel = nil
 }
