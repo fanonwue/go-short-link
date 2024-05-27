@@ -7,15 +7,19 @@ const (
 )
 
 var (
-	logger = &zap.SugaredLogger{}
+	logger = zap.SugaredLogger{}
 )
 
 func SetLogger(newLogger *zap.SugaredLogger) {
-	logger = newLogger
+	if newLogger == nil {
+		logger.Errorf("Passed logger points to nil, keeping old logger")
+		return
+	}
+	logger = *newLogger
 }
 
 func Logger() *zap.SugaredLogger {
-	return logger
+	return &logger
 }
 
 func PrefixedEnvVar(envVar string) string {
