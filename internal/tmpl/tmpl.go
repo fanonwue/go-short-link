@@ -13,8 +13,16 @@ var (
 	initialized = false
 )
 
-func TemplateFS() fs.FS {
+func initIfNeeded() {
+	if initialized {
+		return
+	}
 	initialize()
+	initialized = true
+}
+
+func TemplateFS() fs.FS {
+	initIfNeeded()
 	return templates
 }
 

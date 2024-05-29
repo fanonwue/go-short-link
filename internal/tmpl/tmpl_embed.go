@@ -11,9 +11,5 @@ import (
 var embeddedTemplates embed.FS
 
 func initialize() {
-	if initialized {
-		return
-	}
 	templates = fs.FS(embeddedTemplates)
-	initialized = true
 }
