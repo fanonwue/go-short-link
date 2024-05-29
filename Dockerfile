@@ -22,7 +22,6 @@ ARG WORKDIR
 ENV APP_ENV production
 WORKDIR $WORKDIR
 COPY --from=builder $WORKDIR/bin/go-short-link .
-COPY web $WORKDIR/web
 
 EXPOSE 3000
 
