@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/fanonwue/go-short-link/internal/ds"
 	"github.com/fanonwue/go-short-link/internal/state"
+	"github.com/fanonwue/go-short-link/internal/tmpl"
 	"github.com/fanonwue/go-short-link/internal/util"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
@@ -16,7 +17,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -188,7 +188,7 @@ func createTemplate(baseTemplate *template.Template, targetTemplatePath string) 
 		return nil, err
 	}
 
-	return cloned.ParseFiles(targetTemplatePath)
+	return cloned.ParseFS(tmpl.TemplateFS(), targetTemplatePath)
 }
 
 func templateFuncMap() template.FuncMap {
@@ -226,13 +226,12 @@ func Setup() {
 
 	var err error
 
-	templatePath := "./web/tmpl/"
-	baseTemplateName := "base.gohtml"
 	baseTemplate := template.Must(
-		template.New(baseTemplateName).Funcs(templateFuncMap()).ParseFiles(path.Join(templatePath, baseTemplateName)),
+		template.New(tmpl.BaseTemplateName).Funcs(templateFuncMap()).ParseFS(tmpl.TemplateFS(), tmpl.TemplatePath(tmpl.BaseTemplateName)),
 	)
-	notFoundTemplatePath := path.Join(templatePath, "not-found.gohtml")
-	redirectInfoTemplatePath := path.Join(templatePath, "redirect-info.gohtml")
+
+	notFoundTemplatePath := tmpl.TemplatePath("not-found.gohtml")
+	redirectInfoTemplatePath := tmpl.TemplatePath("redirect-info.gohtml")
 
 	faviconTemplateString := ""
 	if len(appConfig.Favicon) > 0 {
