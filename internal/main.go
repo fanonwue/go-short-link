@@ -297,9 +297,9 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 	pr := RedirectTargetForRequest(r)
 	if !pr.Found {
-		NotFoundHandler(w, &pr)
+		NotFoundHandler(w, pr)
 	} else if pr.InfoRequest && redirectInfoEndpointEnabled() {
-		RedirectInfoHandler(w, &pr)
+		RedirectInfoHandler(w, pr)
 	} else {
 		responseHeader := w.Header()
 		AddDefaultHeadersWithCache(responseHeader)
@@ -404,7 +404,7 @@ func StatusInfoHandler(w http.ResponseWriter, r *http.Request) {
 	}, http.StatusOK)
 }
 
-func RedirectTargetForRequest(r *http.Request) ParsedRequest {
+func RedirectTargetForRequest(r *http.Request) *ParsedRequest {
 	pr := ParsedRequest{
 		Original: r,
 	}
@@ -442,7 +442,7 @@ func RedirectTargetForRequest(r *http.Request) ParsedRequest {
 	pr.Target = target
 	pr.NoBodyRequest = noBodyRequest(r)
 
-	return pr
+	return &pr
 }
 
 func normalizeRedirectPath(path string) (string, bool) {
