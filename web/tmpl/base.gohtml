@@ -67,8 +67,8 @@
     <footer id="footer">
         <hr>
         <p>
-            Page rendered at: <span id="render-time" class="timestamp">{{nowFormatted}}</span><br>
-            Last mapping update: <span id="update-time" class="timestamp">{{lastUpdate}}</span>
+            Page rendered at: <span id="render-time" class="timestamp">{{currentTime.Format timestampFormat}}</span><br>
+            Last mapping update: <span id="update-time" class="timestamp">{{lastUpdate.Format timestampFormat}}</span>
         </p>
         <p>
         {{if showServerName}}
@@ -79,7 +79,7 @@
             {{end}}
             <br>
         {{end}}
-            © 2023-{{now.UTC.Year}} ZenDrake
+            © 2023-{{currentTime.Year}} ZenDrake
         </p>
         <script>
             "use strict";

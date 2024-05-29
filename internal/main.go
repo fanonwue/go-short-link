@@ -191,6 +191,32 @@ func createTemplate(baseTemplate *template.Template, targetTemplatePath string) 
 	return cloned.ParseFiles(targetTemplatePath)
 }
 
+func templateFuncMap() template.FuncMap {
+	currentTimeUtc := func() time.Time {
+		return time.Now().UTC()
+	}
+
+	lastUpdateUtc := func() time.Time {
+		t := time.UnixMilli(0)
+		lu := dataSource.LastUpdate()
+		if lu != nil {
+			t = *lu
+		}
+		return t.UTC()
+	}
+
+	serverName := strings.ToUpper(serverIdentifierHeader)
+
+	return template.FuncMap{
+		"showRepositoryLink": func() bool { return appConfig.ShowRepositoryLink },
+		"showServerName":     func() bool { return appConfig.ShowServerHeader },
+		"serverName":         func() string { return serverName },
+		"currentTime":        currentTimeUtc,
+		"lastUpdate":         lastUpdateUtc,
+		"timestampFormat":    func() string { return time.RFC3339 },
+	}
+}
+
 func Setup() {
 	SetupEnvironment()
 	SetupLogging()
@@ -205,19 +231,10 @@ func Setup() {
 
 	var err error
 
-	templateFuncs := template.FuncMap{
-		"showRepositoryLink": func() bool { return appConfig.ShowRepositoryLink },
-		"showServerName":     func() bool { return appConfig.ShowServerHeader },
-		"serverName":         func() string { return strings.ToUpper(serverIdentifierHeader) },
-		"now":                time.Now,
-		"nowFormatted":       func() string { return time.Now().UTC().Format(time.RFC3339) },
-		"lastUpdate":         func() string { return dataSource.LastUpdate().Format(time.RFC3339) },
-	}
-
 	templatePath := "./web/tmpl/"
 	baseTemplateName := "base.gohtml"
 	baseTemplate := template.Must(
-		template.New(baseTemplateName).Funcs(templateFuncs).ParseFiles(path.Join(templatePath, baseTemplateName)),
+		template.New(baseTemplateName).Funcs(templateFuncMap()).ParseFiles(path.Join(templatePath, baseTemplateName)),
 	)
 	notFoundTemplatePath := path.Join(templatePath, "not-found.gohtml")
 	redirectInfoTemplatePath := path.Join(templatePath, "redirect-info.gohtml")
