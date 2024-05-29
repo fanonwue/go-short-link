@@ -34,9 +34,9 @@ type GoogleSheetsConfig struct {
 }
 
 type GoogleSheetsDataSource struct {
-	lastUpdate        *time.Time
+	lastUpdate        time.Time
 	lastUpdateMutex   sync.RWMutex
-	lastModified      *time.Time
+	lastModified      time.Time
 	lastModifiedMutex sync.RWMutex
 	config            GoogleSheetsConfig
 	httpClient        *http.Client
@@ -239,7 +239,7 @@ func (ds *GoogleSheetsDataSource) Id() string {
 	return ds.SpreadsheetId()
 }
 
-func (ds *GoogleSheetsDataSource) LastUpdate() *time.Time {
+func (ds *GoogleSheetsDataSource) LastUpdate() time.Time {
 	ds.lastUpdateMutex.RLock()
 	defer ds.lastUpdateMutex.RUnlock()
 	return ds.lastUpdate
@@ -255,50 +255,48 @@ func (ds *GoogleSheetsDataSource) SpreadsheetWebLink() (string, error) {
 	return file.WebViewLink, nil
 }
 
-func (ds *GoogleSheetsDataSource) updateLastUpdate(updateTime *time.Time) *time.Time {
+func (ds *GoogleSheetsDataSource) updateLastUpdate(updateTime time.Time) time.Time {
 	ds.lastUpdateMutex.Lock()
 	defer ds.lastUpdateMutex.Unlock()
-	if updateTime == nil {
-		now := time.Now()
-		updateTime = &now
+	if updateTime.IsZero() {
+		updateTime = time.Now()
 	}
 
-	updateTimeUtc := updateTime.UTC()
-	ds.lastUpdate = &updateTimeUtc
+	ds.lastUpdate = updateTime.UTC()
 	return ds.lastUpdate
 }
 
-func (ds *GoogleSheetsDataSource) updateLastModified() (*time.Time, error) {
+func (ds *GoogleSheetsDataSource) updateLastModified() (time.Time, error) {
 	ds.lastModifiedMutex.Lock()
 	defer ds.lastModifiedMutex.Unlock()
 	service := ds.DriveService()
 	file, err := service.Files.Get(ds.config.SpreadsheetId).Fields("modifiedTime").Do()
 	if err != nil {
 		util.Logger().Errorf("Could not determine modifiedTime for Spreadsheet '%s': %v", ds.config.SpreadsheetId, err)
-		return nil, err
+		return time.Time{}, err
 	}
 
 	modifiedTimeRaw := file.ModifiedTime
 	modifiedTime, err := time.Parse(time.RFC3339, modifiedTimeRaw)
 	if err != nil {
 		util.Logger().Errorf("Could not parse RFC3339 timestamp %s: %v", modifiedTimeRaw, err)
-		return nil, err
+		return time.Time{}, err
 	}
 
 	modifiedTimeUtc := modifiedTime.UTC()
 	oldTime := ds.lastModified
-	ds.lastModified = &modifiedTimeUtc
+	ds.lastModified = modifiedTimeUtc
 
-	if oldTime == nil || oldTime.UnixMilli() != modifiedTimeUtc.UnixMilli() {
+	if oldTime.UnixMilli() != modifiedTimeUtc.UnixMilli() {
 		util.Logger().Debugf("Updated last modified time to %v", modifiedTimeUtc)
 	}
 
 	return ds.lastModified, nil
 }
 
-func (ds *GoogleSheetsDataSource) LastModified() *time.Time {
+func (ds *GoogleSheetsDataSource) LastModified() time.Time {
 	ds.lastModifiedMutex.RLock()
-	if ds.lastModified == nil {
+	if ds.lastModified.IsZero() {
 		// Release read lock to allow upgrade to a write lock
 		ds.lastModifiedMutex.RUnlock()
 		modified, _ := ds.updateLastModified()
@@ -310,7 +308,7 @@ func (ds *GoogleSheetsDataSource) LastModified() *time.Time {
 }
 
 func (ds *GoogleSheetsDataSource) NeedsUpdate() bool {
-	if ds.lastUpdate == nil {
+	if ds.lastUpdate.IsZero() {
 		return true
 	}
 
@@ -319,10 +317,10 @@ func (ds *GoogleSheetsDataSource) NeedsUpdate() bool {
 		return true
 	}
 
-	return modifiedTime.After(*ds.lastUpdate)
+	return modifiedTime.After(ds.lastUpdate)
 }
 
-func (ds *GoogleSheetsDataSource) fetchRedirectMappingInternal() (state.RedirectMap, *time.Time, error) {
+func (ds *GoogleSheetsDataSource) fetchRedirectMappingInternal() (state.RedirectMap, time.Time, error) {
 	service := ds.SheetsService()
 
 	sheetsRange := "A2:C"
@@ -331,8 +329,7 @@ func (ds *GoogleSheetsDataSource) fetchRedirectMappingInternal() (state.Redirect
 	}
 
 	mapping := state.RedirectMap{}
-	updateTimeTmp := time.Now().UTC()
-	updateTime := &updateTimeTmp
+	updateTime := time.Now().UTC()
 
 	result, err := service.Spreadsheets.Values.Get(ds.config.SpreadsheetId, sheetsRange).
 		ValueRenderOption("UNFORMATTED_VALUE").
@@ -340,11 +337,11 @@ func (ds *GoogleSheetsDataSource) fetchRedirectMappingInternal() (state.Redirect
 
 	if err != nil {
 		util.Logger().Errorf("Unable to retrieve data from sheet: %v", err)
-		return nil, nil, err
+		return nil, time.Time{}, err
 	}
 
 	if len(result.Values) == 0 {
-		return mapping, updateTime, nil
+		return mapping, time.Time{}, nil
 	}
 
 	for _, row := range result.Values {

@@ -197,12 +197,7 @@ func templateFuncMap() template.FuncMap {
 	}
 
 	lastUpdateUtc := func() time.Time {
-		t := time.UnixMilli(0)
-		lu := dataSource.LastUpdate()
-		if lu != nil {
-			t = *lu
-		}
-		return t.UTC()
+		return dataSource.LastUpdate().UTC()
 	}
 
 	serverName := strings.ToUpper(serverIdentifierHeader)
@@ -366,6 +361,13 @@ func statusResponse(w http.ResponseWriter, r *http.Request, body any, status int
 	return nil
 }
 
+func statusResponseTimeMapper(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
+}
+
 func StatusHealthHandler(w http.ResponseWriter, r *http.Request) {
 	status := http.StatusOK
 
@@ -378,7 +380,7 @@ func StatusHealthHandler(w http.ResponseWriter, r *http.Request) {
 		MappingSize: redirectState.MappingSize(),
 		Running:     server != nil,
 		Healthy:     healthy,
-		LastUpdate:  dataSource.LastUpdate(),
+		LastUpdate:  statusResponseTimeMapper(dataSource.LastUpdate()),
 	}, status)
 }
 
@@ -396,8 +398,8 @@ func StatusInfoHandler(w http.ResponseWriter, r *http.Request) {
 	_ = statusResponse(w, r, StatusInfo{
 		Mapping:       redirectState.CurrentMapping(),
 		SpreadsheetId: dataSource.Id(),
-		LastUpdate:    dataSource.LastUpdate(),
-		LastModified:  dataSource.LastModified(),
+		LastUpdate:    statusResponseTimeMapper(dataSource.LastUpdate()),
+		LastModified:  statusResponseTimeMapper(dataSource.LastModified()),
 		LastError:     errorString,
 	}, http.StatusOK)
 }
