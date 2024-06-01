@@ -325,13 +325,6 @@ func noBodyRequest(r *http.Request) bool {
 	return r.Method == http.MethodHead
 }
 
-func OptionsHandler(w http.ResponseWriter) {
-	h := w.Header()
-	AddDefaultHeadersWithCache(h)
-	h.Set("Allow", "OPTIONS, GET, HEAD")
-	w.WriteHeader(http.StatusOK)
-}
-
 func statusResponse(w http.ResponseWriter, r *http.Request, body any, status int) error {
 	var buf bytes.Buffer
 	h := w.Header()

@@ -8,6 +8,7 @@ import (
 	"github.com/fanonwue/go-short-link/internal/util"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -24,6 +25,17 @@ type wrappedHandler struct {
 	handler http.HandlerFunc
 }
 
+func supportedMethodsString() string {
+	return strings.Join(supportedMethods, ", ")
+}
+
+func OptionsHandler(w http.ResponseWriter) {
+	h := w.Header()
+	AddDefaultHeadersWithCache(h)
+	h.Set("Allow", supportedMethodsString())
+	w.WriteHeader(http.StatusOK)
+}
+
 func (wh wrappedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		OptionsHandler(w)
@@ -31,7 +43,8 @@ func (wh wrappedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !slices.Contains(supportedMethods, r.Method) {
-		http.Error(w, "Method Not Allowed - only GET, HEAD and OPTIONS are allowed", http.StatusMethodNotAllowed)
+		errMsg := fmt.Sprintf("Method is not supported - only [%s] are allowed", supportedMethodsString())
+		http.Error(w, errMsg, http.StatusMethodNotAllowed)
 		return
 	}
 
