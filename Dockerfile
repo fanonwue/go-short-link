@@ -1,9 +1,9 @@
 ARG WORKDIR=/opt/app
 
-FROM golang:1.23-alpine as builder
+FROM golang:1.23-alpine AS builder
 ARG WORKDIR
 # Set Target to production for Makefile
-ENV TARGET prod
+ENV TARGET=prod
 WORKDIR $WORKDIR
 
 # make is needed for the Makefile
@@ -23,7 +23,7 @@ RUN make build
 
 FROM scratch
 ARG WORKDIR
-ENV APP_ENV production
+ENV APP_ENV=production
 WORKDIR $WORKDIR
 # Copy CA certificates from the builder so that they are available to the application
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
