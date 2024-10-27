@@ -16,12 +16,10 @@ import (
 	"html/template"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -212,11 +210,9 @@ func templateFuncMap() template.FuncMap {
 	}
 }
 
-func Setup() {
+func Setup(appContext context.Context) {
 	SetupEnvironment()
 	SetupLogging()
-
-	go osSignalHandler()
 
 	util.Logger().Infof("----- STARTING GO-SHORT-LINK SERVER -----")
 	util.Logger().Infof("Running in production mode: %s", strconv.FormatBool(isProd))
@@ -259,7 +255,7 @@ func Setup() {
 	errorChannel := redirectState.ListenForUpdateErrors()
 
 	UpdateRedirectMapping(targetChannel, errorChannel, true)
-	go StartBackgroundUpdates(targetChannel, errorChannel, quitUpdateJob)
+	go StartBackgroundUpdates(targetChannel, errorChannel, appContext)
 }
 
 func SetupEnvironment() {
@@ -526,14 +522,14 @@ func etagFromData(data string) string {
 	return "\"" + hex.EncodeToString(hash[:etagLength]) + "\""
 }
 
-func StartBackgroundUpdates(targetChannel chan<- state.RedirectMap, lastErrorChannel chan<- error, quitChannel <-chan bool) {
+func StartBackgroundUpdates(targetChannel chan<- state.RedirectMap, lastErrorChannel chan<- error, ctx context.Context) {
 	util.Logger().Infof("Starting background updates at an interval of %d seconds", appConfig.UpdatePeriod)
 	for {
 		time.Sleep(time.Duration(appConfig.UpdatePeriod) * time.Second)
 
 		select {
-		case <-quitChannel:
-			util.Logger().Info("Received quit signal on update job")
+		case <-ctx.Done():
+			util.Logger().Info("Update context cancelled")
 			return
 		default:
 			UpdateRedirectMapping(targetChannel, lastErrorChannel, false)
@@ -709,26 +705,6 @@ func addDefaultRedirectMapHooks() {
 	}
 }
 
-func osSignalHandler() {
-	osSignals := make(chan os.Signal, 1)
-	capturedSignals := []os.Signal{
-		syscall.SIGTERM,
-		syscall.SIGINT,
-		syscall.SIGQUIT,
-	}
-	signal.Notify(osSignals, capturedSignals...)
-	sig := <-osSignals
-	util.Logger().Debugf("Received termination signal \"%s\"", sig)
-	if server != nil {
-		if err := server.Shutdown(context.Background()); err != nil {
-			util.Logger().Panic(err)
-		}
-	} else {
-		OnExit("Shutdown before server was started")
-		os.Exit(0)
-	}
-}
-
 func OnExit(messages ...string) {
 	defer util.Logger().Sync()
 	if len(messages) == 0 {
@@ -739,13 +715,23 @@ func OnExit(messages ...string) {
 	}
 }
 
-func Run() error {
-	Setup()
+func Run(ctx context.Context) error {
+	Setup(ctx)
 	// Flush log buffer before exiting
 	defer util.Logger().Sync()
 
 	shutdownChan := make(chan error)
 	server = CreateHttpServer(shutdownChan)
+
+	select {
+	case <-ctx.Done():
+		shutdownContext, cancel := context.WithTimeout(ctx, 10*time.Second)
+		err := server.Shutdown(shutdownContext)
+		cancel()
+		if err != nil {
+			return err
+		}
+	}
 
 	return <-shutdownChan
 }
