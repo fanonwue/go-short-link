@@ -727,6 +727,7 @@ func Run(ctx context.Context) error {
 	case <-ctx.Done():
 		shutdownContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		util.Logger().Infof("Shutting down HTTP server")
 		err := server.Shutdown(shutdownContext)
 		if err != nil {
 			return err
