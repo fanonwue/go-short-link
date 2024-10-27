@@ -33,7 +33,7 @@ type (
 		IgnoreCaseInPath      bool
 		ShowServerHeader      bool
 		Port                  uint16
-		UpdatePeriod          uint32
+		UpdatePeriod          time.Duration
 		HttpCacheMaxAge       uint32
 		CacheControlHeader    string
 		StatusEndpointEnabled bool
@@ -139,7 +139,7 @@ func CreateAppConfig() *AppConfig {
 		IgnoreCaseInPath:      boolConfig(util.PrefixedEnvVar("IGNORE_CASE_IN_PATH"), true),
 		ShowServerHeader:      boolConfig(util.PrefixedEnvVar("SHOW_SERVER_HEADER"), true),
 		Port:                  uint16(port),
-		UpdatePeriod:          uint32(updatePeriod),
+		UpdatePeriod:          time.Duration(updatePeriod) * time.Second,
 		HttpCacheMaxAge:       uint32(httpCacheMaxAge),
 		CacheControlHeader:    fmt.Sprintf(cacheControlHeaderTemplate, httpCacheMaxAge),
 		StatusEndpointEnabled: !boolConfig(util.PrefixedEnvVar("DISABLE_STATUS"), false),
@@ -523,10 +523,9 @@ func etagFromData(data string) string {
 }
 
 func StartBackgroundUpdates(targetChannel chan<- state.RedirectMap, lastErrorChannel chan<- error, ctx context.Context) {
-	util.Logger().Infof("Starting background updates at an interval of %d seconds", appConfig.UpdatePeriod)
+	util.Logger().Infof("Starting background updates at an interval of %.0f seconds", appConfig.UpdatePeriod.Seconds())
 	for {
-		time.Sleep(time.Duration(appConfig.UpdatePeriod) * time.Second)
-
+		time.Sleep(appConfig.UpdatePeriod)
 		select {
 		case <-ctx.Done():
 			util.Logger().Info("Update context cancelled")
