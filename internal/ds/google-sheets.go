@@ -267,8 +267,6 @@ func (ds *GoogleSheetsDataSource) updateLastUpdate(updateTime time.Time) time.Ti
 }
 
 func (ds *GoogleSheetsDataSource) updateLastModified() (time.Time, error) {
-	ds.lastModifiedMutex.Lock()
-	defer ds.lastModifiedMutex.Unlock()
 	service := ds.DriveService()
 	file, err := service.Files.Get(ds.config.SpreadsheetId).Fields("modifiedTime").Do()
 	if err != nil {
@@ -284,6 +282,8 @@ func (ds *GoogleSheetsDataSource) updateLastModified() (time.Time, error) {
 	}
 
 	modifiedTimeUtc := modifiedTime.UTC()
+	ds.lastModifiedMutex.Lock()
+	defer ds.lastModifiedMutex.Unlock()
 	oldTime := ds.lastModified
 	ds.lastModified = modifiedTimeUtc
 
