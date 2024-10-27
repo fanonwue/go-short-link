@@ -113,6 +113,7 @@ func CreateHttpServer(shutdown chan<- error) *http.Server {
 	}
 
 	go func() {
+		defer close(shutdown)
 		err := srv.ListenAndServe()
 		util.Logger().Debugf("HTTP Server closed")
 		if !errors.Is(err, http.ErrServerClosed) {
