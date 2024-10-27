@@ -524,13 +524,14 @@ func etagFromData(data string) string {
 
 func StartBackgroundUpdates(targetChannel chan<- state.RedirectMap, lastErrorChannel chan<- error, ctx context.Context) {
 	util.Logger().Infof("Starting background updates at an interval of %.0f seconds", appConfig.UpdatePeriod.Seconds())
+	ticker := time.NewTicker(appConfig.UpdatePeriod)
+	defer ticker.Stop()
 	for {
-		time.Sleep(appConfig.UpdatePeriod)
 		select {
 		case <-ctx.Done():
 			util.Logger().Info("Update context cancelled")
 			return
-		default:
+		case <-ticker.C:
 			UpdateRedirectMapping(targetChannel, lastErrorChannel, false)
 		}
 	}
