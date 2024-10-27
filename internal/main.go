@@ -726,8 +726,8 @@ func Run(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		shutdownContext, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
 		err := server.Shutdown(shutdownContext)
-		cancel()
 		if err != nil {
 			return err
 		}
