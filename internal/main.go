@@ -565,10 +565,7 @@ func UpdateRedirectMapping(target chan<- state.RedirectMap, lastError chan<- err
 	updateMapping(fetchedMapping, target)
 
 	if fetchErr == nil && appConfig.UseFallbackFile() {
-		err := writeFallbackFile(appConfig.FallbackFile, fetchedMapping)
-		if err != nil {
-			util.Logger().Warnf("Error writing fallback file: %v", err)
-		}
+		_ = writeFallbackFileLog(appConfig.FallbackFile, fetchedMapping)
 	}
 }
 
@@ -598,23 +595,28 @@ func writeFallbackFile(path string, newMapping state.RedirectMap) error {
 
 	jsonBytes, err := json.Marshal(&jsonEntries)
 	if err != nil {
-		util.Logger().Warnf("Error marshaling fallback file entries to JSON: %v", err)
 		return err
 	}
 
 	err = os.MkdirAll(filepath.Dir(path), 0755)
 	if err != nil {
-		util.Logger().Warnf("Error creating fallback file directory: %v", err)
 		return err
 	}
 
 	err = os.WriteFile(path, jsonBytes, 0644)
 	if err != nil {
-		util.Logger().Warnf("Error writing fallback file: %v", err)
 		return err
 	}
 
 	return nil
+}
+
+func writeFallbackFileLog(path string, newMapping state.RedirectMap) error {
+	err := writeFallbackFile(path, newMapping)
+	if err != nil {
+		util.Logger().Warnf("Error writing fallback file: %v", err)
+	}
+	return err
 }
 
 func readFallbackFile(path string) (state.RedirectMap, error) {
