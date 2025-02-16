@@ -546,11 +546,10 @@ func UpdateRedirectMapping(target chan<- state.RedirectMap, lastError chan<- err
 	fetchedMapping, fetchErr := dataSource.FetchRedirectMapping()
 	if fetchErr != nil {
 		lastError <- fetchErr
-		util.Logger().Warnf("Error fetching new redirect mapping: %v", fetchErr)
+		util.Logger().Warnf("Error fetching new redirect mapping: %s", fetchErr)
 		if appConfig.UseFallbackFile() {
-			fallbackMap, err := readFallbackFile(appConfig.FallbackFile)
+			fallbackMap, err := readFallbackFileLog(appConfig.FallbackFile)
 			if err != nil {
-				util.Logger().Errorf("Redirect map fetch failed, and reading the fallback file failed due to: %v", err)
 				return
 			}
 			fetchedMapping = fallbackMap
@@ -563,19 +562,20 @@ func UpdateRedirectMapping(target chan<- state.RedirectMap, lastError chan<- err
 		lastError <- nil
 	}
 
-	var newMap = fetchedMapping
-
-	for _, hook := range redirectState.Hooks() {
-		newMap = hook(newMap)
-	}
+	updateMapping(fetchedMapping, target)
 
 	if fetchErr == nil && appConfig.UseFallbackFile() {
-		err := writeFallbackFile(appConfig.FallbackFile, newMap)
+		err := writeFallbackFile(appConfig.FallbackFile, fetchedMapping)
 		if err != nil {
 			util.Logger().Warnf("Error writing fallback file: %v", err)
 		}
 	}
+}
 
+func updateMapping(newMap state.RedirectMap, target chan<- state.RedirectMap) {
+	for _, hook := range redirectState.Hooks() {
+		newMap = hook(newMap)
+	}
 	target <- newMap
 }
 
@@ -638,6 +638,15 @@ func readFallbackFile(path string) (state.RedirectMap, error) {
 	}
 
 	return mapping, nil
+}
+
+func readFallbackFileLog(path string) (state.RedirectMap, error) {
+	util.Logger().Infof("Reading fallback file")
+	fallbackMap, fallbackErr := readFallbackFile(path)
+	if fallbackErr != nil {
+		util.Logger().Warnf("Could not read fallback file %s: %v", appConfig.FallbackFile, fallbackErr)
+	}
+	return fallbackMap, fallbackErr
 }
 
 func AddDefaultHeaders(h http.Header) {
