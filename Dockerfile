@@ -1,6 +1,6 @@
 ARG WORKDIR=/opt/app
 
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 ARG WORKDIR
 # Set Target to production for Makefile
 ENV TARGET=prod
