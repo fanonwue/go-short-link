@@ -1,8 +1,8 @@
 package ds
 
 import (
-	"bytes"
 	"context"
+	"encoding/pem"
 	"github.com/fanonwue/go-short-link/internal/state"
 	"github.com/fanonwue/go-short-link/internal/util"
 	"golang.org/x/oauth2/google"
@@ -45,8 +45,6 @@ type GoogleSheetsDataSource struct {
 }
 
 const (
-	// If enabled, the read key will be validated to make sure it is a PEM-formatted key
-	validateKeyContent = false
 	defaultKeyFilePath = "secret/privateKey.pem"
 	keyColumn          = 0
 	targetColumn       = 1
@@ -78,33 +76,22 @@ func createSheetsConfig() GoogleSheetsConfig {
 
 func getServiceAccountPrivateKey() []byte {
 	// Read private key from env or file, and trim whitespace just to be sure
-	var keyData = readPrivateKeyData(true)
+	var keyData = readPrivateKeyData()
+	var pemBlock, _ = pem.Decode(keyData)
 
-	if len(keyData) < 100 {
+	if pemBlock == nil || !strings.Contains(pemBlock.Type, "PRIVATE KEY") {
+		util.Logger().Panicf("Key is not a valid PEM-formatted private key")
+		return nil
+	}
+
+	if len(pemBlock.Bytes) < 100 {
 		util.Logger().Warnf("Keyfile smaller than 100 Bytes! This is probably unintended. Length: %d", len(keyData))
 	}
 
-	if validateKeyContent {
-		util.Logger().Info("Key validation enabled, performing checks")
-		keyString := string(keyData)
-
-		keyPrefix := "-----BEGIN PRIVATE KEY-----"
-		if !strings.HasPrefix(keyString, keyPrefix) {
-			util.Logger().Panicf("Key does not start with expected prefix: %s", keyPrefix)
-		}
-
-		keySuffix := "-----END PRIVATE KEY-----"
-		if !strings.HasSuffix(keyString, keySuffix) {
-			util.Logger().Panicf("Key does not end with expected suffix: %s", keySuffix)
-		}
-	} else {
-		util.Logger().Info("Key validation disabled, skipping checks")
-	}
-
-	return keyData
+	return pemBlock.Bytes
 }
 
-func readPrivateKeyData(trimWhitespace bool) []byte {
+func readPrivateKeyData() []byte {
 	var keyData []byte
 	rawKey := os.Getenv(util.PrefixedEnvVar("SERVICE_ACCOUNT_PRIVATE_KEY"))
 	if len(rawKey) > 0 {
@@ -133,11 +120,7 @@ func readPrivateKeyData(trimWhitespace bool) []byte {
 		keyData = fileContent
 	}
 
-	if trimWhitespace {
-		return bytes.TrimSpace(keyData)
-	} else {
-		return keyData
-	}
+	return keyData
 }
 
 func CreateSheetsDataSource() *GoogleSheetsDataSource {
