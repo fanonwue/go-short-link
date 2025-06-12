@@ -2,27 +2,20 @@ package util
 
 import (
 	"bytes"
-	"go.uber.org/zap"
+	"fmt"
+	"time"
 )
+
+type ConsoleWriter struct{}
 
 const (
-	envVarPrefix = "APP_"
+	envVarPrefix  = "APP_"
+	logTimeFormat = "2006-01-02 15:04:05"
 )
 
-var (
-	logger = zap.SugaredLogger{}
-)
+func (w ConsoleWriter) Write(p []byte) (n int, err error) {
 
-func SetLogger(newLogger *zap.SugaredLogger) {
-	if newLogger == nil {
-		logger.Errorf("Passed logger points to nil, keeping old logger")
-		return
-	}
-	logger = *newLogger
-}
-
-func Logger() *zap.SugaredLogger {
-	return &logger
+	return fmt.Printf("%s [%s] - %s", time.Now().Format(logTimeFormat), "INFO", p)
 }
 
 func PrefixedEnvVar(envVar string) string {

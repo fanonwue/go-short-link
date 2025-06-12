@@ -3,14 +3,14 @@
 package tmpl
 
 import (
-	"github.com/fanonwue/go-short-link/internal/util"
+	"log/slog"
 	"os"
 )
 
 func initialize() {
 	webRoot, err := os.OpenRoot("./web")
 	if err != nil {
-		util.Logger().Fatalf("Failed to read web templates: %v", err)
+		slog.Error("Failed to read web templates", "err", err)
 	}
 	templates = webRoot.FS()
 }

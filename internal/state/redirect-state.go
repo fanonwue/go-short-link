@@ -1,7 +1,7 @@
 package state
 
 import (
-	"github.com/fanonwue/go-short-link/internal/util"
+	"log/slog"
 	"sync"
 )
 
@@ -119,11 +119,11 @@ func (state *RedirectMapState) ListenForUpdates() chan<- RedirectMap {
 func (state *RedirectMapState) updateListener() {
 	for mapping := range state.mappingChannel {
 		state.UpdateMapping(mapping)
-		util.Logger().Infof("Updated redirect mapping, number of entries: %d", len(mapping))
+		slog.Info("Updated redirect mapping", slog.Int("entryCount", len(mapping)))
 	}
 
 	// The mappingChannel has been closed at this point, so we need to reflect that in our local state
-	util.Logger().Debugf("Setting redirect state mappingChannel to nil")
+	slog.Debug("Setting redirect state mappingChannel to nil")
 	state.mappingChannel = nil
 }
 
@@ -132,6 +132,6 @@ func (state *RedirectMapState) errorListener() {
 		state.UpdateLastError(err)
 	}
 
-	util.Logger().Debugf("Setting redirect state errorChannel to nil")
+	slog.Debug("Setting redirect state errorChannel to nil")
 	state.lastErrorChannel = nil
 }

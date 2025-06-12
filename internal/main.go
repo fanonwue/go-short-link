@@ -14,6 +14,8 @@ import (
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 	"html/template"
+	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -124,9 +126,10 @@ func CreateAppConfig() *AppConfig {
 		updatePeriod = defaultUpdatePeriod
 	}
 	if updatePeriod < minimumUpdatePeriod {
-		util.Logger().Warnf(
-			"UPDATE_PERIOD set to less than %d seconds (minimum), setting it to %d seconds (default)",
-			minimumUpdatePeriod, defaultUpdatePeriod)
+		slog.Warn("UPDATE_PERIOD set to less than minimum, setting it to default",
+			slog.Uint64("current", updatePeriod),
+			slog.Int("min", minimumUpdatePeriod),
+			slog.Int("default", defaultUpdatePeriod))
 		updatePeriod = defaultUpdatePeriod
 	}
 
@@ -214,8 +217,8 @@ func Setup(appContext context.Context) {
 	SetupEnvironment()
 	SetupLogging()
 
-	util.Logger().Infof("----- STARTING GO-SHORT-LINK SERVER -----")
-	util.Logger().Infof("Running in production mode: %s", strconv.FormatBool(isProd))
+	slog.Info("----- STARTING GO-SHORT-LINK SERVER -----")
+	slog.Info("Mode", "production", strconv.FormatBool(isProd))
 
 	CreateAppConfig()
 	dataSource = ds.CreateSheetsDataSource()
@@ -242,11 +245,11 @@ func Setup(appContext context.Context) {
 
 	redirectInfoTemplate, err = createTemplate(baseTemplate, redirectInfoTemplatePath)
 	if err != nil {
-		util.Logger().Warnf("Could not load redirect-info template file %s: %v", redirectInfoTemplatePath, err)
+		slog.Warn("Could not load redirect-info template file", "path", redirectInfoTemplatePath, "err", err)
 	}
 
 	if appConfig.UseFallbackFile() {
-		util.Logger().Infof("Fallback file enabled at path: %s", appConfig.FallbackFile)
+		slog.Info("Fallback file enabled at path", "path", appConfig.FallbackFile)
 	}
 
 	addDefaultRedirectMapHooks()
@@ -266,26 +269,11 @@ func SetupEnvironment() {
 }
 
 func SetupLogging() {
-	logConfig := zap.NewDevelopmentConfig()
-	if isProd {
-		logConfig.Development = false
-		logConfig.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
-		logConfig.OutputPaths = []string{"stdout"}
-	}
-	baseLogger, _ := logConfig.Build()
-	// Make sure to flush logger to avoid mangled output
-	defer baseLogger.Sync()
-	logger = baseLogger.Sugar()
+	log.SetFlags(0)
 
-	// Set zap's globals
-	zap.ReplaceGlobals(baseLogger)
-	util.SetLogger(logger)
+	opts := slog.HandlerOptions{}
 
-	// Set global logger as well
-	_, err := zap.RedirectStdLogAt(baseLogger, logConfig.Level.Level())
-	if err != nil {
-		util.Logger().Errorf("Could not set global logger: %v", err)
-	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(util.ConsoleWriter{}, &opts)))
 }
 
 func ServerHandler(w http.ResponseWriter, r *http.Request) {
@@ -313,7 +301,7 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	if logResponseTimes {
 		endTime := time.Now()
 		duration := endTime.Sub(startTime)
-		util.Logger().Debugf("Request evaluation took %dµs", duration.Microseconds())
+		slog.Debug("Request evaluation time", "µs", duration.Microseconds())
 	}
 }
 
@@ -329,7 +317,7 @@ func statusResponse(w http.ResponseWriter, r *http.Request, body any, status int
 	err := json.NewEncoder(&buf).Encode(body)
 
 	if err != nil {
-		util.Logger().Errorf("Error writing status data to buffer: %v", err)
+		slog.Error("Error writing status data to buffer", "err", err)
 		http.Error(w, "Unknown Error", http.StatusInternalServerError)
 		return err
 	}
@@ -342,7 +330,7 @@ func statusResponse(w http.ResponseWriter, r *http.Request, body any, status int
 	if !noBodyRequest(r) {
 		_, err = buf.WriteTo(w)
 		if err != nil {
-			util.Logger().Errorf("Error writing status data to response body: %v", err)
+			slog.Error("Error writing status data to response body", "err", err)
 		}
 		return err
 	}
@@ -462,7 +450,7 @@ func RedirectInfoHandler(w http.ResponseWriter, pr *ParsedRequest) {
 	})
 
 	if err != nil {
-		util.Logger().Errorf("Could not render redirect-info template: %v", err)
+		slog.Warn("Could not render redirect-info template", "err", err)
 	}
 
 	etagData := redirectEtag(pr.NormalizedPath, pr.Target, "info")
@@ -485,7 +473,7 @@ func NotFoundHandler(w http.ResponseWriter, pr *ParsedRequest) {
 	})
 
 	if err != nil {
-		util.Logger().Errorf("Could not render not-found template: %v", err)
+		slog.Error("Could not render not-found template", "err", err)
 	}
 
 	htmlResponse(w, pr, http.StatusNotFound, renderedBuf, "")
@@ -508,7 +496,7 @@ func htmlResponse(w http.ResponseWriter, pr *ParsedRequest, status int, buffer *
 	if !pr.NoBodyRequest {
 		_, err := buffer.WriteTo(w)
 		if err != nil {
-			util.Logger().Errorf("Could not write response body: %v", err)
+			slog.Error("Could not write response body", "err", err)
 		}
 	}
 }
@@ -523,13 +511,13 @@ func etagFromData(data string) string {
 }
 
 func StartBackgroundUpdates(targetChannel chan<- state.RedirectMap, lastErrorChannel chan<- error, ctx context.Context) {
-	util.Logger().Infof("Starting background updates at an interval of %.0f seconds", appConfig.UpdatePeriod.Seconds())
+	slog.Info("Starting background updates", slog.Float64("interval", appConfig.UpdatePeriod.Seconds()))
 	ticker := time.NewTicker(appConfig.UpdatePeriod)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
-			util.Logger().Info("Update context cancelled")
+			slog.Info("Update context cancelled")
 			return
 		case <-ticker.C:
 			UpdateRedirectMapping(targetChannel, lastErrorChannel, false)
@@ -539,23 +527,23 @@ func StartBackgroundUpdates(targetChannel chan<- state.RedirectMap, lastErrorCha
 
 func UpdateRedirectMapping(target chan<- state.RedirectMap, lastError chan<- error, force bool) {
 	if !force && !dataSource.NeedsUpdate() && redirectState.LastError() == nil {
-		util.Logger().Debugf("File has not changed since last update, skipping update")
+		slog.Debug("File has not changed since last update, skipping update")
 		return
 	}
 
 	fetchedMapping, fetchErr := dataSource.FetchRedirectMapping()
 	if fetchErr != nil {
 		lastError <- fetchErr
-		util.Logger().Warnf("Error fetching new redirect mapping: %s", fetchErr)
+		slog.Warn("Error fetching new redirect mapping", "err", fetchErr)
 		if appConfig.UseFallbackFile() {
 			fallbackMap, err := readFallbackFileLog(appConfig.FallbackFile)
 			if err != nil {
 				return
 			}
 			fetchedMapping = fallbackMap
-			util.Logger().Infof("Read from fallback file")
+			slog.Info("Read from fallback file")
 		} else {
-			util.Logger().Warnf("Fallback file disabled")
+			slog.Warn("Fallback file disabled")
 			return
 		}
 	} else {
@@ -578,7 +566,7 @@ func updateMapping(newMap state.RedirectMap, target chan<- state.RedirectMap) {
 
 func writeFallbackFile(path string, newMapping state.RedirectMap) error {
 	if len(path) == 0 {
-		util.Logger().Debugf("Fallback file path is empty, skipping write")
+		slog.Debug("Fallback file path is empty, skipping write")
 		return nil
 	}
 
@@ -614,7 +602,7 @@ func writeFallbackFile(path string, newMapping state.RedirectMap) error {
 func writeFallbackFileLog(path string, newMapping state.RedirectMap) error {
 	err := writeFallbackFile(path, newMapping)
 	if err != nil {
-		util.Logger().Warnf("Error writing fallback file: %v", err)
+		slog.Warn("Error writing fallback file", "err", err)
 	}
 	return err
 }
@@ -622,14 +610,14 @@ func writeFallbackFileLog(path string, newMapping state.RedirectMap) error {
 func readFallbackFile(path string) (state.RedirectMap, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		util.Logger().Warnf("Error reading fallback file: %v", err)
+		slog.Warn("Error reading fallback file", "err", err)
 		return nil, err
 	}
 
 	var entries []FallbackFileEntry
 	err = json.Unmarshal(data, &entries)
 	if err != nil {
-		util.Logger().Warnf("Error unmarshaling fallback file: %v", err)
+		slog.Warn("Error unmarshalling fallback file", "err", err)
 		return nil, err
 	}
 
@@ -643,10 +631,10 @@ func readFallbackFile(path string) (state.RedirectMap, error) {
 }
 
 func readFallbackFileLog(path string) (state.RedirectMap, error) {
-	util.Logger().Infof("Reading fallback file")
+	slog.Info("Reading fallback file")
 	fallbackMap, fallbackErr := readFallbackFile(path)
 	if fallbackErr != nil {
-		util.Logger().Warnf("Could not read fallback file %s: %v", appConfig.FallbackFile, fallbackErr)
+		slog.Warn("Could not read fallback file", "file", appConfig.FallbackFile, "err", fallbackErr)
 	}
 	return fallbackMap, fallbackErr
 }
@@ -679,7 +667,7 @@ func addDefaultRedirectMapHooks() {
 		}
 	}
 
-	util.Logger().Debug("Adding update hook to strip leading and trailing slashes from redirect paths")
+	slog.Debug("Adding update hook to strip leading and trailing slashes from redirect paths")
 	redirectState.AddHook(func(originalMap state.RedirectMap) state.RedirectMap {
 		for key := range originalMap {
 			modifyKey(originalMap, key, func(s string) string {
@@ -690,7 +678,7 @@ func addDefaultRedirectMapHooks() {
 	})
 
 	if redirectInfoEndpointEnabled() {
-		util.Logger().Debug("Adding update hook to remove info-request suffix from redirect paths")
+		slog.Debug("Adding update hook to remove info-request suffix from redirect paths")
 		redirectState.AddHook(func(originalMap state.RedirectMap) state.RedirectMap {
 			// Edit map in place
 			for key := range originalMap {
@@ -703,7 +691,7 @@ func addDefaultRedirectMapHooks() {
 	}
 
 	if appConfig.IgnoreCaseInPath {
-		util.Logger().Debug("Adding update hook to make redirect paths lowercase")
+		slog.Debug("Adding update hook to make redirect paths lowercase")
 		redirectState.AddHook(func(originalMap state.RedirectMap) state.RedirectMap {
 			// Edit map in place
 			for key := range originalMap {
@@ -716,20 +704,8 @@ func addDefaultRedirectMapHooks() {
 	}
 }
 
-func OnExit(messages ...string) {
-	defer util.Logger().Sync()
-	if len(messages) == 0 {
-		messages = append(messages, "Server stopped")
-	}
-	for i := range messages {
-		util.Logger().Infof(messages[i])
-	}
-}
-
 func Run(ctx context.Context) error {
 	Setup(ctx)
-	// Flush log buffer before exiting
-	defer util.Logger().Sync()
 
 	shutdownChan := make(chan error)
 	server = CreateHttpServer(shutdownChan)
@@ -738,7 +714,7 @@ func Run(ctx context.Context) error {
 	case <-ctx.Done():
 		shutdownContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		util.Logger().Infof("Shutting down HTTP server")
+		slog.Info("Shutting down HTTP server")
 		err := server.Shutdown(shutdownContext)
 		if err != nil {
 			return err
