@@ -214,12 +214,13 @@ func Setup(appContext context.Context) {
 
 	var err error
 
-	baseTemplate := template.Must(
-		tmpl.ReadTemplate(tmpl.BaseTemplateName, templateFuncMap()),
-	)
+	tpc := tmpl.NewTemplateParserContext()
 
-	notFoundTemplatePath := tmpl.TemplatePath("not-found.gohtml")
-	redirectInfoTemplatePath := tmpl.TemplatePath("redirect-info.gohtml")
+	tpc.SetFuncMap(templateFuncMap())
+
+	template.Must(
+		tpc.ParseBaseTemplateFile(tmpl.BaseTemplateName),
+	)
 
 	faviconTemplateString := ""
 	if len(appConfig.Favicon) > 0 {
@@ -227,12 +228,15 @@ func Setup(appContext context.Context) {
 	}
 
 	if len(faviconTemplateString) > 0 {
-		baseTemplate = template.Must(baseTemplate.Parse(faviconTemplateString))
+		template.Must(tpc.ParseBaseTemplate(faviconTemplateString))
 	}
 
-	notFoundTemplate = template.Must(tmpl.ReadTemplateWithBase(baseTemplate, notFoundTemplatePath))
+	notFoundTemplatePath := tmpl.TemplatePath("not-found.gohtml")
+	redirectInfoTemplatePath := tmpl.TemplatePath("redirect-info.gohtml")
 
-	redirectInfoTemplate, err = tmpl.ReadTemplateWithBase(baseTemplate, redirectInfoTemplatePath)
+	notFoundTemplate = template.Must(tpc.ParseTemplateFile(notFoundTemplatePath))
+
+	redirectInfoTemplate, err = tpc.ParseTemplateFile(redirectInfoTemplatePath)
 	if err != nil {
 		util.Logger().Warnf("Could not load redirect-info template file %s: %v", redirectInfoTemplatePath, err)
 	}
