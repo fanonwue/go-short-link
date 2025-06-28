@@ -15,6 +15,10 @@ ifneq (, $(filter $(NO_EMBED), $(TRUTHY_VALUES)))
 	GO_TAGS := $(GO_TAGS),noembed
 endif
 
+ifneq (, $(filter $(MINIFY), $(TRUTHY_VALUES)))
+	GO_TAGS := $(GO_TAGS),minify
+endif
+
 EXECUTABLE_NAME := go-short-link
 ifeq ($(GOOS), windows)
 	EXECUTABLE_NAME := $(EXECUTABLE_NAME).exe

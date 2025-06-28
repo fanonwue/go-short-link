@@ -10,6 +10,7 @@ import (
 	"github.com/fanonwue/go-short-link/internal/ds"
 	"github.com/fanonwue/go-short-link/internal/state"
 	"github.com/fanonwue/go-short-link/internal/tmpl"
+	"github.com/fanonwue/go-short-link/internal/tmpl/minify"
 	"github.com/fanonwue/go-short-link/internal/util"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
@@ -238,6 +239,10 @@ func Setup(appContext context.Context) {
 
 	if appConfig.UseFallbackFile() {
 		util.Logger().Infof("Fallback file enabled at path: %s", appConfig.FallbackFile)
+	}
+
+	if minify.EnableMinification {
+		util.Logger().Info("Response minification enabled")
 	}
 
 	addDefaultRedirectMapHooks()
@@ -486,6 +491,15 @@ func htmlResponse(w http.ResponseWriter, pr *ParsedRequest, status int, buffer *
 	responseHeader := w.Header()
 
 	AddDefaultHeadersWithCache(responseHeader)
+
+	if minify.EnableMinification {
+		newBuf := util.NewBuffer(buffer.Len())
+		_, err := newBuf.ReadFrom(minify.FromReader(buffer))
+		if err != nil {
+			util.Logger().Errorf("Could not minify response: %v", err)
+		}
+		buffer = newBuf
+	}
 
 	responseHeader.Set("Content-Type", "text/html; charset=utf-8")
 	responseHeader.Set("Content-Length", strconv.Itoa(buffer.Len()))
