@@ -180,15 +180,6 @@ func createAdminCredentials() *AdminCredentials {
 	}
 }
 
-func createTemplate(baseTemplate *template.Template, targetTemplatePath string) (*template.Template, error) {
-	cloned, err := baseTemplate.Clone()
-	if err != nil {
-		return nil, err
-	}
-
-	return cloned.ParseFS(tmpl.TemplateFS(), targetTemplatePath)
-}
-
 func templateFuncMap() template.FuncMap {
 	currentTimeUtc := func() time.Time {
 		return time.Now().UTC()
@@ -223,7 +214,7 @@ func Setup(appContext context.Context) {
 	var err error
 
 	baseTemplate := template.Must(
-		template.New(tmpl.BaseTemplateName).Funcs(templateFuncMap()).ParseFS(tmpl.TemplateFS(), tmpl.TemplatePath(tmpl.BaseTemplateName)),
+		tmpl.ReadTemplate(tmpl.BaseTemplateName, templateFuncMap()),
 	)
 
 	notFoundTemplatePath := tmpl.TemplatePath("not-found.gohtml")
@@ -238,9 +229,9 @@ func Setup(appContext context.Context) {
 		baseTemplate = template.Must(baseTemplate.Parse(faviconTemplateString))
 	}
 
-	notFoundTemplate = template.Must(createTemplate(baseTemplate, notFoundTemplatePath))
+	notFoundTemplate = template.Must(tmpl.ReadTemplateWithBase(baseTemplate, notFoundTemplatePath))
 
-	redirectInfoTemplate, err = createTemplate(baseTemplate, redirectInfoTemplatePath)
+	redirectInfoTemplate, err = tmpl.ReadTemplateWithBase(baseTemplate, redirectInfoTemplatePath)
 	if err != nil {
 		util.Logger().Warnf("Could not load redirect-info template file %s: %v", redirectInfoTemplatePath, err)
 	}

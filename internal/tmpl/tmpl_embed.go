@@ -11,5 +11,5 @@ import (
 var embeddedTemplates embed.FS
 
 func init() {
-	templates = fs.FS(embeddedTemplates)
+	templates = fs.ReadFileFS(embeddedTemplates)
 }
