@@ -228,7 +228,7 @@ func Setup(appContext context.Context) {
 	}
 
 	if len(faviconTemplateString) > 0 {
-		template.Must(tpc.ParseBaseTemplate(faviconTemplateString))
+		template.Must(tpc.ParseBaseTemplate(tmpl.BaseTemplateName, faviconTemplateString))
 	}
 
 	notFoundTemplatePath := tmpl.TemplatePath("not-found.gohtml")

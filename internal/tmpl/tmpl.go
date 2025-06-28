@@ -21,12 +21,12 @@ var (
 	templates fs.FS
 )
 
-func (tpc *TemplateParserContext) ParseTemplate(stringTemplate string) (*template.Template, error) {
-	return readTemplateWithBaseFuncMap(tpc.baseTemplate, stringTemplate, false, tpc.funcMap)
+func (tpc *TemplateParserContext) ParseTemplate(templateName string, templateData string) (*template.Template, error) {
+	return readTemplateWithBaseFuncMap(tpc.baseTemplate, templateName, templateData, tpc.funcMap)
 }
 
 func (tpc *TemplateParserContext) ParseTemplateFile(templateName string) (*template.Template, error) {
-	return readTemplateWithBaseFuncMap(tpc.baseTemplate, templateName, true, tpc.funcMap)
+	return readTemplateWithBaseFuncMap(tpc.baseTemplate, templateName, "", tpc.funcMap)
 }
 
 func (tpc *TemplateParserContext) ParseBaseTemplateFile(templateName string) (*template.Template, error) {
@@ -38,8 +38,8 @@ func (tpc *TemplateParserContext) ParseBaseTemplateFile(templateName string) (*t
 	return base, nil
 }
 
-func (tpc *TemplateParserContext) ParseBaseTemplate(templateName string) (*template.Template, error) {
-	base, err := tpc.ParseTemplate(templateName)
+func (tpc *TemplateParserContext) ParseBaseTemplate(templateName string, templateData string) (*template.Template, error) {
+	base, err := tpc.ParseTemplate(templateName, templateData)
 	if err != nil {
 		return nil, err
 	}
@@ -76,10 +76,10 @@ func TemplatePath(templateName string) string {
 func readTemplateWithBaseFuncMap(
 	baseTemplate *template.Template,
 	templateName string,
-	isFile bool,
+	templateData string,
 	funcMap template.FuncMap,
 ) (*template.Template, error) {
-	return readTemplateWithBaseCallback(baseTemplate, templateName, isFile, func(createdTemplate *template.Template) *template.Template {
+	return readTemplateWithBaseCallback(baseTemplate, templateName, templateData, func(createdTemplate *template.Template) *template.Template {
 		if funcMap == nil {
 			return createdTemplate
 		}
@@ -90,7 +90,7 @@ func readTemplateWithBaseFuncMap(
 func readTemplateWithBaseCallback(
 	baseTemplate *template.Template,
 	templateName string,
-	isFile bool,
+	templateData string,
 	preParseCallback func(createdTemplate *template.Template) *template.Template,
 ) (*template.Template, error) {
 	var base *template.Template
@@ -108,9 +108,9 @@ func readTemplateWithBaseCallback(
 		base = preParseCallback(base)
 	}
 
-	if isFile {
-		return base.ParseFS(TemplateFS(), TemplatePath(templateName))
+	if templateData != "" {
+		return base.Parse(templateData)
 	}
 
-	return base.Parse(templateName)
+	return base.ParseFS(TemplateFS(), TemplatePath(templateName))
 }
