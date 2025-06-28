@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-func initialize() {
+func init() {
 	webRoot, err := os.OpenRoot("./web")
 	if err != nil {
 		util.Logger().Fatalf("Failed to read web templates: %v", err)

@@ -9,20 +9,10 @@ const templatePathPrefix = "./html/"
 const BaseTemplateName = "base.gohtml"
 
 var (
-	templates   fs.FS
-	initialized = false
+	templates fs.FS
 )
 
-func initIfNeeded() {
-	if initialized {
-		return
-	}
-	initialize()
-	initialized = true
-}
-
 func TemplateFS() fs.FS {
-	initIfNeeded()
 	return templates
 }
 

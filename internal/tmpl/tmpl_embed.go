@@ -10,6 +10,6 @@ import (
 //go:embed html
 var embeddedTemplates embed.FS
 
-func initialize() {
+func init() {
 	templates = fs.FS(embeddedTemplates)
 }
