@@ -67,8 +67,10 @@
     <footer id="footer">
         <hr>
         <p>
-            Page rendered at: <span id="render-time" class="timestamp">{{currentTime.Format timestampFormat}}</span><br>
-            Last mapping update: <span id="update-time" class="timestamp">{{lastUpdate.Format timestampFormat}}</span>
+            Page rendered at: <span id="render-time" class="timestamp" data-timestamp="{{currentTime.Format timestampFormat}}">
+                {{currentTime.Format timestampFormat}}</span><br>
+            Last mapping update: <span id="update-time" class="timestamp" data-timestamp="{{lastUpdate.Format timestampFormat}}">
+                {{lastUpdate.Format timestampFormat}}</span>
         </p>
         <p>
         {{if showServerName}}
@@ -97,7 +99,7 @@
             }
 
             document.querySelectorAll(".timestamp").forEach(el => {
-                el.innerText = utcToLocal(el.innerText)
+                el.innerText = utcToLocal(el.dataset.timestamp ?? el.innerText)
             })
 
         </script>
