@@ -11,6 +11,7 @@ type (
 	Endpoint struct {
 		Pattern string
 		Handler http.HandlerFunc
+		Methods []srv.HttpMethod
 	}
 )
 
@@ -20,12 +21,19 @@ const (
 
 func Endpoints() []Endpoint {
 	endpoints := []Endpoint{
-		{Pattern: Prefix + "/update-mapping", Handler: UpdateMappingHandler},
+		{Pattern: Prefix + "/update-mapping", Handler: UpdateMappingHandler, Methods: []srv.HttpMethod{
+			srv.POST,
+		}},
 	}
 
 	for i := range endpoints {
 		endpoint := &endpoints[i]
-		endpoints[i].Handler = wrapMiddleware(endpoint.Handler)
+
+		if endpoint.Methods == nil {
+			endpoint.Methods = []srv.HttpMethod{srv.GET}
+		}
+
+		endpoints[i].Handler = wrapMiddleware(endpoint)
 	}
 
 	return endpoints
@@ -33,6 +41,14 @@ func Endpoints() []Endpoint {
 
 func unauthorizedHandler(w http.ResponseWriter, r *http.Request) {
 	_ = srv.TextResponse(w, r, "Unauthorized", http.StatusUnauthorized)
+}
+
+func illegalMethodHandler(w http.ResponseWriter, r *http.Request) {
+	_ = srv.TextResponse(w, r, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+func isMethod(method srv.HttpMethod, r *http.Request) bool {
+	return srv.HttpMethod(r.Method) == method
 }
 
 func isAuthenticated(r *http.Request) bool {
@@ -47,14 +63,19 @@ func requireAuthenticated(r *http.Request, next http.HandlerFunc) http.HandlerFu
 	return unauthorizedHandler
 }
 
-func wrapMiddleware(handler http.HandlerFunc) http.HandlerFunc {
+func wrapMiddleware(endpoint *Endpoint) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		newHandler := requireAuthenticated(r, handler)
+		newHandler := requireAuthenticated(r, endpoint.Handler)
 		newHandler(w, r)
 	}
 }
 
 func UpdateMappingHandler(w http.ResponseWriter, r *http.Request) {
+	if !isMethod(srv.POST, r) {
+		illegalMethodHandler(w, r)
+		return
+	}
+
 	newMap, err := repo.UpdateRedirectMappingDefault(true)
 	if err != nil {
 		_ = srv.TextResponse(w, r, err.Error(), http.StatusInternalServerError)

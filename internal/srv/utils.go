@@ -13,6 +13,20 @@ import (
 	"time"
 )
 
+type HttpMethod string
+
+const (
+	GET     HttpMethod = http.MethodGet
+	POST    HttpMethod = http.MethodPost
+	PUT     HttpMethod = http.MethodPut
+	DELETE  HttpMethod = http.MethodDelete
+	HEAD    HttpMethod = http.MethodHead
+	OPTIONS HttpMethod = http.MethodOptions
+	PATCH   HttpMethod = http.MethodPatch
+	TRACE   HttpMethod = http.MethodTrace
+	CONNECT HttpMethod = http.MethodConnect
+)
+
 func NoBodyRequest(r *http.Request) bool {
 	return r.Method == http.MethodHead
 }
