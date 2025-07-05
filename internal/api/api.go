@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"github.com/fanonwue/go-short-link/internal/conf"
 	"github.com/fanonwue/go-short-link/internal/repo"
 	"github.com/fanonwue/go-short-link/internal/srv"
 	"net/http"
@@ -11,7 +12,6 @@ type (
 	Endpoint struct {
 		Pattern string
 		Handler http.HandlerFunc
-		Methods []srv.HttpMethod
 	}
 )
 
@@ -21,18 +21,11 @@ const (
 
 func Endpoints() []Endpoint {
 	endpoints := []Endpoint{
-		{Pattern: Prefix + "/update-mapping", Handler: UpdateMappingHandler, Methods: []srv.HttpMethod{
-			srv.POST,
-		}},
+		{Pattern: Prefix + "/update-mapping", Handler: UpdateMappingHandler},
 	}
 
 	for i := range endpoints {
 		endpoint := &endpoints[i]
-
-		if endpoint.Methods == nil {
-			endpoint.Methods = []srv.HttpMethod{srv.GET}
-		}
-
 		endpoints[i].Handler = wrapMiddleware(endpoint)
 	}
 
@@ -40,11 +33,11 @@ func Endpoints() []Endpoint {
 }
 
 func unauthorizedHandler(w http.ResponseWriter, r *http.Request) {
-	_ = srv.TextResponse(w, r, "Unauthorized", http.StatusUnauthorized)
+	srv.OnUnauthorized("api", w)
 }
 
 func illegalMethodHandler(w http.ResponseWriter, r *http.Request) {
-	_ = srv.TextResponse(w, r, "Method not allowed", http.StatusMethodNotAllowed)
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
 func isMethod(method srv.HttpMethod, r *http.Request) bool {
@@ -52,8 +45,11 @@ func isMethod(method srv.HttpMethod, r *http.Request) bool {
 }
 
 func isAuthenticated(r *http.Request) bool {
-	// TODO Implement this
-	return false
+	creds := conf.Config().AdminCredentials
+	if creds == nil {
+		return false
+	}
+	return srv.CheckCredentials(r, creds)
 }
 
 func requireAuthenticated(r *http.Request, next http.HandlerFunc) http.HandlerFunc {
@@ -64,14 +60,15 @@ func requireAuthenticated(r *http.Request, next http.HandlerFunc) http.HandlerFu
 }
 
 func wrapMiddleware(endpoint *Endpoint) http.HandlerFunc {
+	originalHandler := endpoint.Handler
 	return func(w http.ResponseWriter, r *http.Request) {
-		newHandler := requireAuthenticated(r, endpoint.Handler)
+		newHandler := requireAuthenticated(r, originalHandler)
 		newHandler(w, r)
 	}
 }
 
 func UpdateMappingHandler(w http.ResponseWriter, r *http.Request) {
-	if !isMethod(srv.POST, r) {
+	if !isMethod(srv.POST, r) && !isMethod(srv.GET, r) {
 		illegalMethodHandler(w, r)
 		return
 	}

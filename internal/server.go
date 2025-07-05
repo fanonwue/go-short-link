@@ -1,8 +1,6 @@
 package internal
 
 import (
-	"crypto/sha256"
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"github.com/fanonwue/go-short-link/internal/api"
@@ -68,27 +66,11 @@ func checkBasicAuth(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 
-	onUnauthorized := func() bool {
-		w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return false
-	}
-
-	user, pass, ok := r.BasicAuth()
-	if !ok {
-		return onUnauthorized()
-	}
-
-	userHash := sha256.Sum256([]byte(user))
-	passHash := sha256.Sum256([]byte(pass))
-
-	userMatched := subtle.ConstantTimeCompare(creds.UserHash, userHash[:]) == 1
-	passMatched := subtle.ConstantTimeCompare(creds.PassHash, passHash[:]) == 1
-
-	if userMatched && passMatched {
+	if srv.CheckCredentials(r, creds) {
 		return true
 	} else {
-		return onUnauthorized()
+		srv.OnUnauthorized("sensitive-status", w)
+		return false
 	}
 }
 

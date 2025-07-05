@@ -1,7 +1,6 @@
 package conf
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"github.com/fanonwue/go-short-link/internal/util"
 	"os"
@@ -109,7 +108,7 @@ func CreateAppConfig() *AppConfig {
 		ShowRepositoryLink:    boolConfig(util.PrefixedEnvVar("SHOW_REPOSITORY_LINK"), false),
 		Favicon:               os.Getenv(util.PrefixedEnvVar("FAVICON")),
 		FallbackFile:          os.Getenv(util.PrefixedEnvVar("FALLBACK_FILE")),
-		ApiEnabled:            boolConfig(util.PrefixedEnvVar("ENABLE_API"), true),
+		ApiEnabled:            boolConfig(util.PrefixedEnvVar("ENABLE_API"), false),
 	}
 
 	// Only allow API in dev environment for now
@@ -134,11 +133,18 @@ func createAdminCredentials() *AdminCredentials {
 		return nil
 	}
 
-	userHash := sha256.Sum256([]byte(user))
-	passHash := sha256.Sum256([]byte(pass))
+	userHash, err := util.HashPassword([]byte(user))
+	if err != nil {
+		util.Logger().Panicf("Failed to hash admin credentials USER: %v", err)
+	}
+
+	passHash, err := util.HashPassword([]byte(pass))
+	if err != nil {
+		util.Logger().Panicf("Failed to hash admin credentials PASS: %v", err)
+	}
 
 	return &AdminCredentials{
-		UserHash: userHash[:],
-		PassHash: passHash[:],
+		UserHash: userHash,
+		PassHash: passHash,
 	}
 }

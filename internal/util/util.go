@@ -3,6 +3,7 @@ package util
 import (
 	"bytes"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -31,4 +32,12 @@ func PrefixedEnvVar(envVar string) string {
 
 func NewBuffer(cap int) *bytes.Buffer {
 	return bytes.NewBuffer(make([]byte, 0, cap))
+}
+
+func HashPassword(rawPassword []byte) ([]byte, error) {
+	return bcrypt.GenerateFromPassword(rawPassword, bcrypt.DefaultCost)
+}
+
+func ComparePasswords(rawPassword, hashedPassword []byte) error {
+	return bcrypt.CompareHashAndPassword(hashedPassword, rawPassword)
 }

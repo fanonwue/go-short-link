@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"github.com/fanonwue/go-short-link/internal/conf"
 	"github.com/fanonwue/go-short-link/internal/tmpl/minify"
 	"github.com/fanonwue/go-short-link/internal/util"
@@ -147,4 +148,25 @@ func HtmlResponse(w http.ResponseWriter, withBody bool, status int, buffer *byte
 func EtagFromData(data string) string {
 	hash := sha256.Sum256([]byte(data))
 	return "\"" + hex.EncodeToString(hash[:conf.EtagLength]) + "\""
+}
+
+func CheckCredentials(r *http.Request, creds *conf.AdminCredentials) bool {
+	if creds == nil {
+		return false
+	}
+
+	user, pass, ok := r.BasicAuth()
+	if !ok {
+		return false
+	}
+
+	userMatchErr := util.ComparePasswords([]byte(user), creds.UserHash)
+	passMatchErr := util.ComparePasswords([]byte(pass), creds.PassHash)
+
+	return userMatchErr == nil && passMatchErr == nil
+}
+
+func OnUnauthorized(realm string, w http.ResponseWriter) {
+	w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Basic realm="%s", charset="UTF-8"`, realm))
+	http.Error(w, "Unauthorized", http.StatusUnauthorized)
 }
