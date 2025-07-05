@@ -5,6 +5,9 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"github.com/fanonwue/go-short-link/internal/api"
+	"github.com/fanonwue/go-short-link/internal/conf"
+	"github.com/fanonwue/go-short-link/internal/srv"
 	"github.com/fanonwue/go-short-link/internal/util"
 	"net/http"
 	"slices"
@@ -31,7 +34,7 @@ func supportedMethodsString() string {
 
 func OptionsHandler(w http.ResponseWriter) {
 	h := w.Header()
-	AddDefaultHeadersWithCache(h)
+	srv.AddDefaultHeadersWithCache(h)
 	h.Set("Allow", supportedMethodsString())
 	w.WriteHeader(http.StatusOK)
 }
@@ -52,7 +55,7 @@ func (wh wrappedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func checkBasicAuth(w http.ResponseWriter, r *http.Request) bool {
-	creds := appConfig.AdminCredentials
+	creds := conf.Config().AdminCredentials
 	if creds == nil {
 		return true
 	}
@@ -92,20 +95,26 @@ func wrapHandlerTimeout(handlerFunc func(http.ResponseWriter, *http.Request)) ht
 }
 
 func CreateHttpServer(shutdown chan<- error) *http.Server {
-	util.Logger().Infof("Starting HTTP server on port %d", appConfig.Port)
+	util.Logger().Infof("Starting HTTP server on port %d", conf.Config().Port)
 
 	mux := http.NewServeMux()
 
 	// Default handler
 	mux.Handle("/", wrapHandlerTimeout(ServerHandler))
 
-	if appConfig.StatusEndpointEnabled {
+	if conf.Config().StatusEndpointEnabled {
 		mux.Handle(statusEndpoint+"/health", wrapHandlerTimeout(StatusHealthHandler))
 		mux.Handle(statusEndpoint+"/info", wrapHandlerTimeout(StatusInfoHandler))
 	}
 
-	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", appConfig.Port),
+	if conf.Config().ApiEnabled {
+		for _, endpoint := range api.Endpoints() {
+			mux.Handle(endpoint.Pattern, wrapHandlerTimeout(endpoint.Handler))
+		}
+	}
+
+	httpServer := &http.Server{
+		Addr:         fmt.Sprintf(":%d", conf.Config().Port),
 		Handler:      mux,
 		ReadTimeout:  requestTimeout,
 		WriteTimeout: requestTimeout,
@@ -114,7 +123,7 @@ func CreateHttpServer(shutdown chan<- error) *http.Server {
 
 	go func() {
 		defer close(shutdown)
-		err := srv.ListenAndServe()
+		err := httpServer.ListenAndServe()
 		util.Logger().Debugf("HTTP Server closed")
 		if !errors.Is(err, http.ErrServerClosed) {
 			util.Logger().Errorf("Error creating server: %v", err)
@@ -124,5 +133,5 @@ func CreateHttpServer(shutdown chan<- error) *http.Server {
 		}
 	}()
 
-	return srv
+	return httpServer
 }
