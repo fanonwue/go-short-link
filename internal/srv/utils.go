@@ -28,7 +28,12 @@ const (
 )
 
 func NoBodyRequest(r *http.Request) bool {
-	return r.Method == http.MethodHead
+	switch HttpMethod(r.Method) {
+	case HEAD, OPTIONS:
+		return true
+	default:
+		return false
+	}
 }
 
 func AddDefaultHeaders(h http.Header) {

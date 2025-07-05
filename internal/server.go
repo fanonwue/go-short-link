@@ -21,15 +21,23 @@ const (
 )
 
 var (
-	supportedMethods = []string{http.MethodGet, http.MethodHead, http.MethodOptions}
+	supportedMethods = []srv.HttpMethod{srv.GET, srv.HEAD, srv.OPTIONS}
 )
 
 type wrappedHandler struct {
 	handler http.HandlerFunc
 }
 
+func supportedMethodsStringSlice() []string {
+	methodsStringSlice := make([]string, len(supportedMethods))
+	for i, method := range supportedMethods {
+		methodsStringSlice[i] = string(method)
+	}
+	return methodsStringSlice
+}
+
 func supportedMethodsString() string {
-	return strings.Join(supportedMethods, ", ")
+	return strings.Join(supportedMethodsStringSlice(), ", ")
 }
 
 func OptionsHandler(w http.ResponseWriter) {
@@ -40,12 +48,12 @@ func OptionsHandler(w http.ResponseWriter) {
 }
 
 func (wh wrappedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodOptions {
+	if srv.HttpMethod(r.Method) == srv.OPTIONS {
 		OptionsHandler(w)
 		return
 	}
 
-	if !slices.Contains(supportedMethods, r.Method) {
+	if !slices.Contains(supportedMethods, srv.HttpMethod(r.Method)) {
 		errMsg := fmt.Sprintf("Method is not supported - only [%s] are allowed", supportedMethodsString())
 		http.Error(w, errMsg, http.StatusMethodNotAllowed)
 		return
