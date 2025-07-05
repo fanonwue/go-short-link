@@ -84,6 +84,16 @@ func wrapHandlerTimeout(handlerFunc func(http.ResponseWriter, *http.Request)) ht
 	return http.TimeoutHandler(wrapHandler(handlerFunc), requestTimeout, "Request timeout exceeded")
 }
 
+func addFaviconHandler(iconType conf.FaviconType, mux *http.ServeMux) {
+	favicon, found := conf.Config().FaviconByType(iconType)
+	if !found {
+		return
+	}
+	mux.Handle(fmt.Sprintf("/favicon.%s", string(iconType)), wrapHandlerTimeout(func(w http.ResponseWriter, r *http.Request) {
+		FaviconHandler(w, r, favicon)
+	}))
+}
+
 func CreateHttpServer(shutdown chan<- error) *http.Server {
 	util.Logger().Infof("Starting HTTP server on port %d", conf.Config().Port)
 
@@ -91,6 +101,11 @@ func CreateHttpServer(shutdown chan<- error) *http.Server {
 
 	// Default handler
 	mux.Handle("/", wrapHandlerTimeout(ServerHandler))
+
+	// Favicons Handler
+	for iconType := range conf.Config().Favicons {
+		addFaviconHandler(iconType, mux)
+	}
 
 	if conf.Config().StatusEndpointEnabled {
 		mux.Handle(statusEndpoint+"/health", wrapHandlerTimeout(StatusHealthHandler))

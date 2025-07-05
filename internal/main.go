@@ -109,8 +109,9 @@ func Setup(appContext context.Context) {
 	)
 
 	faviconTemplateString := ""
-	if len(conf.Config().Favicon) > 0 {
-		faviconTemplateString = fmt.Sprintf("{{define \"icon\"}}%s{{end}}", conf.Config().Favicon)
+	icoFavicon, found := conf.Config().FaviconByType(conf.FaviconTypeIco)
+	if found {
+		faviconTemplateString = fmt.Sprintf("{{define \"icon\"}}%s{{end}}", icoFavicon)
 	}
 
 	if len(faviconTemplateString) > 0 {
@@ -195,6 +196,10 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 		duration := endTime.Sub(startTime)
 		util.Logger().Debugf("Request evaluation took %dµs", duration.Microseconds())
 	}
+}
+
+func FaviconHandler(w http.ResponseWriter, r *http.Request, favicon string) {
+	http.Redirect(w, r, favicon, http.StatusTemporaryRedirect)
 }
 
 func StatusHealthHandler(w http.ResponseWriter, r *http.Request) {

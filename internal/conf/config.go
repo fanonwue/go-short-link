@@ -11,6 +11,8 @@ import (
 )
 
 type (
+	FaviconType string
+
 	AdminCredentials struct {
 		UserHash []byte
 		PassHash []byte
@@ -27,12 +29,17 @@ type (
 		UseETag               bool
 		UseRedirectBody       bool
 		AdminCredentials      *AdminCredentials
-		Favicon               string
+		Favicons              map[FaviconType]string
 		AllowRootRedirect     bool
 		FallbackFile          string
 		ShowRepositoryLink    bool
 		ApiEnabled            bool
 	}
+)
+
+const (
+	FaviconTypePng FaviconType = "png"
+	FaviconTypeIco FaviconType = "ico"
 )
 
 const (
@@ -52,6 +59,15 @@ var (
 
 func (ac *AppConfig) UseFallbackFile() bool {
 	return len(ac.FallbackFile) > 0
+}
+
+func (ac *AppConfig) HasFavicons() bool {
+	return len(ac.Favicons) > 0
+}
+
+func (ac *AppConfig) FaviconByType(t FaviconType) (string, bool) {
+	val, ok := ac.Favicons[t]
+	return val, ok
 }
 
 func init() {
@@ -106,9 +122,23 @@ func CreateAppConfig() *AppConfig {
 		UseRedirectBody:       boolConfig(util.PrefixedEnvVar("ENABLE_REDIRECT_BODY"), true),
 		AllowRootRedirect:     boolConfig(util.PrefixedEnvVar("ALLOW_ROOT_REDIRECT"), true),
 		ShowRepositoryLink:    boolConfig(util.PrefixedEnvVar("SHOW_REPOSITORY_LINK"), false),
-		Favicon:               os.Getenv(util.PrefixedEnvVar("FAVICON")),
+		Favicons:              make(map[FaviconType]string),
 		FallbackFile:          os.Getenv(util.PrefixedEnvVar("FALLBACK_FILE")),
 		ApiEnabled:            boolConfig(util.PrefixedEnvVar("ENABLE_API"), false),
+	}
+
+	rawFavicons := os.Getenv(util.PrefixedEnvVar("FAVICON"))
+	favicons := strings.Split(rawFavicons, ",")
+	for _, favicon := range favicons {
+		favicon = strings.TrimSpace(favicon)
+		if favicon == "" {
+			continue
+		}
+		faviconType := FaviconTypeIco
+		if strings.HasSuffix(favicon, ".png") {
+			faviconType = FaviconTypePng
+		}
+		currentConfig.Favicons[faviconType] = favicon
 	}
 
 	// Only allow API in dev environment for now
