@@ -20,10 +20,38 @@ const (
 
 func Endpoints() []Endpoint {
 	endpoints := []Endpoint{
-		//{Pattern: Prefix + "/update-mapping", Handler: UpdateMappingHandler},
+		{Pattern: Prefix + "/update-mapping", Handler: UpdateMappingHandler},
+	}
+
+	for i := range endpoints {
+		endpoint := &endpoints[i]
+		endpoints[i].Handler = wrapMiddleware(endpoint.Handler)
 	}
 
 	return endpoints
+}
+
+func unauthorizedHandler(w http.ResponseWriter, r *http.Request) {
+	_ = srv.TextResponse(w, r, "Unauthorized", http.StatusUnauthorized)
+}
+
+func isAuthenticated(r *http.Request) bool {
+	// TODO Implement this
+	return false
+}
+
+func requireAuthenticated(r *http.Request, next http.HandlerFunc) http.HandlerFunc {
+	if isAuthenticated(r) {
+		return next
+	}
+	return unauthorizedHandler
+}
+
+func wrapMiddleware(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		newHandler := requireAuthenticated(r, handler)
+		newHandler(w, r)
+	}
 }
 
 func UpdateMappingHandler(w http.ResponseWriter, r *http.Request) {

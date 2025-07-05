@@ -112,6 +112,9 @@ func CreateAppConfig() *AppConfig {
 		ApiEnabled:            boolConfig(util.PrefixedEnvVar("ENABLE_API"), true),
 	}
 
+	// Only allow API in dev environment for now
+	currentConfig.ApiEnabled = currentConfig.ApiEnabled && !isProd
+
 	return currentConfig
 }
 
