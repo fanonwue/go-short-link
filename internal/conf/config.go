@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"github.com/fanonwue/go-short-link/internal/util"
 	"os"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -46,10 +48,21 @@ const (
 
 var (
 	currentConfig *AppConfig
+	isProd        bool
 )
 
 func (ac *AppConfig) UseFallbackFile() bool {
 	return len(ac.FallbackFile) > 0
+}
+
+func init() {
+	prodEnvValues := []string{"prod", "production"}
+	envValue := strings.ToLower(os.Getenv(util.PrefixedEnvVar("ENV")))
+	isProd = slices.Contains(prodEnvValues, envValue)
+}
+
+func IsProd() bool {
+	return isProd
 }
 
 func Config() *AppConfig {

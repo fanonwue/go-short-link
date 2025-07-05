@@ -14,8 +14,6 @@ import (
 	"go.uber.org/zap"
 	"html/template"
 	"net/http"
-	"os"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -63,7 +61,6 @@ const (
 
 var (
 	server               *http.Server
-	isProd               bool
 	logger               *zap.SugaredLogger
 	notFoundTemplate     *template.Template
 	redirectInfoTemplate *template.Template
@@ -96,7 +93,7 @@ func Setup(appContext context.Context) {
 	SetupLogging()
 
 	util.Logger().Infof("----- STARTING GO-SHORT-LINK SERVER -----")
-	util.Logger().Infof("Running in production mode: %s", strconv.FormatBool(isProd))
+	util.Logger().Infof("Running in production mode: %s", strconv.FormatBool(conf.IsProd()))
 
 	conf.CreateAppConfig()
 	repo.Setup()
@@ -146,14 +143,11 @@ func Setup(appContext context.Context) {
 
 func SetupEnvironment() {
 	_ = godotenv.Load()
-	prodEnvValues := []string{"prod", "production"}
-	envValue := strings.ToLower(os.Getenv(util.PrefixedEnvVar("ENV")))
-	isProd = slices.Contains(prodEnvValues, envValue)
 }
 
 func SetupLogging() {
 	logConfig := zap.NewDevelopmentConfig()
-	if isProd {
+	if conf.IsProd() {
 		logConfig.Development = false
 		logConfig.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
 		logConfig.OutputPaths = []string{"stdout"}
