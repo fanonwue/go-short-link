@@ -15,6 +15,9 @@ import (
 
 type HttpMethod string
 
+// BodyFunc A function that provides the content type, the actual body (in bytes) and any error that occurred while producing the body
+type BodyFunc func() (string, *bytes.Buffer, error)
+
 const (
 	GET     HttpMethod = http.MethodGet
 	POST    HttpMethod = http.MethodPost
@@ -36,6 +39,10 @@ func NoBodyRequest(r *http.Request) bool {
 	}
 }
 
+func WithBodyRequest(r *http.Request) bool {
+	return !NoBodyRequest(r)
+}
+
 func AddDefaultHeaders(h http.Header) {
 	if conf.Config().ShowServerHeader {
 		h.Set("Server", conf.ServerIdentifierHeader)
@@ -51,7 +58,7 @@ func StatusResponse(
 	w http.ResponseWriter,
 	r *http.Request,
 	status int,
-	bodyFunc func() (string, *bytes.Buffer, error),
+	bodyFunc BodyFunc,
 ) error {
 	h := w.Header()
 	AddDefaultHeaders(h)
@@ -71,7 +78,7 @@ func StatusResponse(
 
 	w.WriteHeader(status)
 
-	if !NoBodyRequest(r) {
+	if WithBodyRequest(r) {
 		_, err = body.WriteTo(w)
 		if err != nil {
 			util.Logger().Errorf("Error writing status data to response body: %v", err)
