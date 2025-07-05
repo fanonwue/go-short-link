@@ -1,0 +1,5 @@
+{{define "favicons"}}
+    {{ range $entry := favicons }}
+        <link rel="icon" href="{{$entry.Value}}" type="{{$entry.Type.Mime}}">
+    {{end}}
+{{end}}

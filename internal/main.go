@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"fmt"
 	"github.com/fanonwue/go-short-link/internal/conf"
 	"github.com/fanonwue/go-short-link/internal/repo"
 	"github.com/fanonwue/go-short-link/internal/srv"
@@ -85,6 +84,7 @@ func templateFuncMap() template.FuncMap {
 		"currentTime":        currentTimeUtc,
 		"lastUpdate":         lastUpdateUtc,
 		"timestampFormat":    func() string { return time.RFC3339 },
+		"favicons":           func() []conf.FaviconEntry { return conf.Config().FaviconEntries() },
 	}
 }
 
@@ -108,14 +108,9 @@ func Setup(appContext context.Context) {
 		tpc.ParseBaseTemplateFile(tmpl.BaseTemplateName),
 	)
 
-	faviconTemplateString := ""
-	icoFavicon, found := conf.Config().FaviconByType(conf.FaviconTypeIco)
-	if found {
-		faviconTemplateString = fmt.Sprintf("{{define \"icon\"}}%s{{end}}", icoFavicon)
-	}
-
-	if len(faviconTemplateString) > 0 {
-		template.Must(tpc.ParseBaseTemplate(tmpl.BaseTemplateName, faviconTemplateString))
+	favicons := conf.Config().Favicons
+	if len(favicons) > 0 {
+		template.Must(tpc.ParseBaseTemplateFile(tmpl.TemplatePath("favicons.gohtml")))
 	}
 
 	notFoundTemplatePath := tmpl.TemplatePath("not-found.gohtml")

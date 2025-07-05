@@ -35,6 +35,11 @@ type (
 		ShowRepositoryLink    bool
 		ApiEnabled            bool
 	}
+
+	FaviconEntry struct {
+		Type  FaviconType
+		Value string
+	}
 )
 
 const (
@@ -68,6 +73,42 @@ func (ac *AppConfig) HasFavicons() bool {
 func (ac *AppConfig) FaviconByType(t FaviconType) (string, bool) {
 	val, ok := ac.Favicons[t]
 	return val, ok
+}
+
+func (ac *AppConfig) FaviconEntries() []FaviconEntry {
+	entries := make([]FaviconEntry, 0, len(ac.Favicons))
+	for t, v := range ac.Favicons {
+		entries = append(entries, FaviconEntry{t, v})
+	}
+	slices.SortFunc(entries, func(a, b FaviconEntry) int {
+		return b.Type.Priority() - a.Type.Priority()
+	})
+	return entries
+}
+
+func (t FaviconType) String() string {
+	return string(t)
+}
+
+func (t FaviconType) Mime() string {
+	switch t {
+	case FaviconTypeIco:
+		return "image/x-icon"
+	case FaviconTypePng:
+		return "image/png"
+	}
+
+	util.Logger().Panicf("Unknown favicon type: %s", t)
+	return ""
+}
+
+func (t FaviconType) Priority() int {
+	switch t {
+	case FaviconTypePng:
+		return 100
+	default:
+		return 0
+	}
 }
 
 func init() {
