@@ -4,6 +4,9 @@ FROM golang:1.24-alpine AS builder
 ARG WORKDIR
 # Set Target to production for Makefile
 ENV TARGET=prod
+# CGO should be disabled anyway because no build tools are installed, but this makes sure the resulting binary
+# will be a static binary
+ENV CGO_ENABLED=0
 WORKDIR $WORKDIR
 
 # make is needed for the Makefile
