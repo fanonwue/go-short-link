@@ -164,7 +164,11 @@ func SetupLogging() {
 }
 
 func ServerHandler(w http.ResponseWriter, r *http.Request) {
-	startTime := time.Now()
+	var startTime time.Time
+	if conf.LogResponseTimes {
+		startTime = time.Now()
+	}
+
 	pr := RedirectTargetForRequest(r)
 	if !pr.Found {
 		NotFoundHandler(w, pr)
