@@ -26,6 +26,13 @@ type (
 	}
 )
 
+const (
+	// channelCapacity specifies the capacity of the internal channels
+	// A capacity of 2 should ensure that adding a new value to the channel should never
+	// realistically block
+	channelCapacity = 2
+)
+
 func NewState() RedirectMapState {
 	return RedirectMapState{
 		mapping: RedirectMap{},
@@ -92,14 +99,14 @@ func (state *RedirectMapState) AddHook(hook RedirectMapHook) {
 
 func (state *RedirectMapState) MappingChannel() chan<- RedirectMap {
 	if state.mappingChannel == nil {
-		state.mappingChannel = make(chan RedirectMap)
+		state.mappingChannel = newChannel[RedirectMap]()
 	}
 	return state.mappingChannel
 }
 
 func (state *RedirectMapState) ErrorChannel() chan<- error {
 	if state.lastErrorChannel == nil {
-		state.lastErrorChannel = make(chan error)
+		state.lastErrorChannel = newChannel[error]()
 	}
 	return state.lastErrorChannel
 }
@@ -134,4 +141,8 @@ func (state *RedirectMapState) errorListener() {
 
 	util.Logger().Debugf("Setting redirect state errorChannel to nil")
 	state.lastErrorChannel = nil
+}
+
+func newChannel[T any]() chan T {
+	return make(chan T, channelCapacity)
 }
