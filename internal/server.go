@@ -89,7 +89,14 @@ func addFaviconHandler(iconType conf.FaviconType, mux *http.ServeMux) {
 	if !found {
 		return
 	}
-	mux.Handle(fmt.Sprintf("/favicon.%s", string(iconType)), wrapHandlerTimeout(func(w http.ResponseWriter, r *http.Request) {
+
+	// Only register a handler if the specified favicon is actually a remote address
+	isRemote := strings.Contains(favicon, "//")
+	if !isRemote {
+		return
+	}
+
+	mux.Handle(fmt.Sprintf("/favicon.%s", iconType.String()), wrapHandlerTimeout(func(w http.ResponseWriter, r *http.Request) {
 		FaviconHandler(w, r, favicon)
 	}))
 }
