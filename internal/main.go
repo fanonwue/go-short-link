@@ -108,8 +108,7 @@ func Setup(appContext context.Context) {
 		tpc.ParseBaseTemplateFile(tmpl.BaseTemplateName),
 	)
 
-	favicons := conf.Config().Favicons
-	if len(favicons) > 0 {
+	if conf.Config().HasFavicons() {
 		template.Must(tpc.ParseBaseTemplateFile(tmpl.TemplatePath("favicons.gohtml")))
 	}
 
