@@ -336,7 +336,20 @@ func NotFoundHandler(w http.ResponseWriter, pr *ParsedRequest) {
 }
 
 func redirectEtag(requestPath string, target string, suffix string) string {
-	return requestPath + "#" + target + "#" + suffix
+	var builder strings.Builder
+
+	// Pre-allocate capacity to avoid reallocations
+	// Estimate: len(requestPath) + len(target) + len(suffix) + 2 (for "#" characters)
+	builder.Grow(len(requestPath) + len(target) + len(suffix) + 2)
+
+	builder.WriteString(requestPath)
+	builder.WriteByte('#')
+	builder.WriteString(target)
+	builder.WriteByte('#')
+	builder.WriteString(suffix)
+
+	return builder.String()
+
 }
 
 func StartBackgroundUpdates(ctx context.Context) {
