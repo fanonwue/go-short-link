@@ -96,7 +96,7 @@ func Setup(appContext context.Context) {
 	util.Logger().Infof("Running in production mode: %s", strconv.FormatBool(conf.IsProd()))
 
 	conf.CreateAppConfig()
-	repo.Setup()
+	repo.Setup(appContext)
 
 	var err error
 

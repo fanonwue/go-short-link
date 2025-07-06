@@ -42,10 +42,13 @@ type GoogleSheetsDataSource struct {
 	httpClient        *http.Client
 	sheetsService     *sheets.Service
 	driveService      *drive.Service
+	ctx               context.Context
+	ctxCancel         context.CancelFunc
 }
 
 const (
 	defaultKeyFilePath = "secret/privateKey.pem"
+	contextTimeout     = 15 * time.Second
 	keyColumn          = 0
 	targetColumn       = 1
 	isActiveColumn     = 2
@@ -123,9 +126,13 @@ func readPrivateKeyData() []byte {
 	return keyData
 }
 
-func CreateSheetsDataSource() *GoogleSheetsDataSource {
+func CreateSheetsDataSource(ctx context.Context) *GoogleSheetsDataSource {
+	serviceCtx, cancelFunc := context.WithCancel(ctx)
+
 	_ds := GoogleSheetsDataSource{
-		config: createSheetsConfig(),
+		config:    createSheetsConfig(),
+		ctx:       serviceCtx,
+		ctxCancel: cancelFunc,
 	}
 
 	_ds.postCreate()
@@ -135,6 +142,19 @@ func CreateSheetsDataSource() *GoogleSheetsDataSource {
 
 func (dsc *GoogleSheetsConfig) UseServiceAccount() bool {
 	return dsc.Auth != nil
+}
+
+func (ds *GoogleSheetsDataSource) serviceContextWithCancel() (context.Context, context.CancelFunc) {
+	return ds.ctx, ds.ctxCancel
+}
+
+func (ds *GoogleSheetsDataSource) serviceContext() context.Context {
+	ctx, _ := ds.serviceContextWithCancel()
+	return ctx
+}
+
+func (ds *GoogleSheetsDataSource) serviceContextWithTimeout(duration time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ds.serviceContext(), duration)
 }
 
 func (ds *GoogleSheetsDataSource) apiScopes() []string {
@@ -166,10 +186,12 @@ func (ds *GoogleSheetsDataSource) getClient() *http.Client {
 				jwtConfig.PrivateKeyID = keyId
 			}
 
-			ds.httpClient = jwtConfig.Client(context.Background())
+			ds.httpClient = jwtConfig.Client(ds.serviceContext())
 		} else {
 			ds.httpClient = &http.Client{}
 		}
+
+		ds.httpClient.Timeout = contextTimeout * 2
 	}
 
 	return ds.httpClient
@@ -192,7 +214,8 @@ func (ds *GoogleSheetsDataSource) serviceClientOpts() []option.ClientOption {
 
 func (ds *GoogleSheetsDataSource) DriveService() *drive.Service {
 	if ds.driveService == nil {
-		newService, err := drive.NewService(context.Background(), ds.serviceClientOpts()...)
+		ctx := ds.serviceContext()
+		newService, err := drive.NewService(ctx, ds.serviceClientOpts()...)
 		if err != nil {
 			util.Logger().Panicf("Could not create drive service: %v", err)
 		} else {
@@ -204,7 +227,7 @@ func (ds *GoogleSheetsDataSource) DriveService() *drive.Service {
 
 func (ds *GoogleSheetsDataSource) SheetsService() *sheets.Service {
 	if ds.sheetsService == nil {
-		newService, err := sheets.NewService(context.Background(), ds.serviceClientOpts()...)
+		newService, err := sheets.NewService(ds.serviceContext(), ds.serviceClientOpts()...)
 		if err != nil {
 			util.Logger().Panicf("Could not create sheets service: %v", err)
 		} else {
@@ -230,11 +253,20 @@ func (ds *GoogleSheetsDataSource) LastUpdate() time.Time {
 
 func (ds *GoogleSheetsDataSource) SpreadsheetWebLink() (string, error) {
 	service := ds.DriveService()
-	file, err := service.Files.Get(ds.config.SpreadsheetId).Fields("webViewLink").Do()
+
+	// Use a context with timeout
+	ctx, cancel := ds.serviceContextWithTimeout(contextTimeout)
+	defer cancel()
+
+	file, err := service.Files.Get(ds.config.SpreadsheetId).Fields("webViewLink").
+		Context(ctx).
+		Do()
+
 	if err != nil {
 		util.Logger().Warnf("Could not determine webViewLink for Spreadsheet '%s': %v", ds.config.SpreadsheetId, err)
 		return "", err
 	}
+
 	return file.WebViewLink, nil
 }
 
@@ -251,7 +283,14 @@ func (ds *GoogleSheetsDataSource) updateLastUpdate(updateTime time.Time) time.Ti
 
 func (ds *GoogleSheetsDataSource) updateLastModified() (time.Time, error) {
 	service := ds.DriveService()
-	file, err := service.Files.Get(ds.config.SpreadsheetId).Fields("modifiedTime").Do()
+
+	// Use a context with timeout
+	ctx, cancel := ds.serviceContextWithTimeout(contextTimeout)
+	defer cancel()
+
+	file, err := service.Files.Get(ds.config.SpreadsheetId).Fields("modifiedTime").
+		Context(ctx).
+		Do()
 	if err != nil {
 		util.Logger().Errorf("Could not determine modifiedTime for Spreadsheet '%s': %v", ds.config.SpreadsheetId, err)
 		return time.Time{}, err
@@ -314,7 +353,12 @@ func (ds *GoogleSheetsDataSource) fetchRedirectMappingInternal() (state.Redirect
 	mapping := state.RedirectMap{}
 	updateTime := time.Now().UTC()
 
+	// Use a context with timeout
+	ctx, cancel := ds.serviceContextWithTimeout(contextTimeout)
+	defer cancel()
+
 	result, err := service.Spreadsheets.Values.Get(ds.config.SpreadsheetId, sheetsRange).
+		Context(ctx).
 		ValueRenderOption("UNFORMATTED_VALUE").
 		Do()
 

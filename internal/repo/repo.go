@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/fanonwue/go-short-link/internal/conf"
 	"github.com/fanonwue/go-short-link/internal/ds"
@@ -22,8 +23,8 @@ var (
 	redirectState = state.NewState()
 )
 
-func Setup() {
-	dataSource = ds.CreateSheetsDataSource()
+func Setup(ctx context.Context) {
+	dataSource = ds.CreateSheetsDataSource(ctx)
 	RedirectState().ListenForUpdates()
 	RedirectState().ListenForUpdateErrors()
 }
