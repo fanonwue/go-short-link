@@ -7,6 +7,7 @@ PROD_TARGETS=prod production
 ifneq (, $(filter $(TARGET), $(PROD_TARGETS)))
 	GO_TAGS := release
 	LD_FLAGS := -w -s
+	ADDITIONAL_FLAGS := -trimpath
 else
 	GO_TAGS := debug
 endif
@@ -25,10 +26,10 @@ ifeq ($(GOOS), windows)
 endif
 
 build:
-	go build -tags $(GO_TAGS) -o bin/$(EXECUTABLE_NAME) --ldflags="$(LD_FLAGS)"
+	go build -tags $(GO_TAGS) -o bin/$(EXECUTABLE_NAME) --ldflags="$(LD_FLAGS)" $(ADDITIONAL_FLAGS)
 
 build-noembed:
-	go build -tags $(GO_TAGS),noembed -o bin/$(EXECUTABLE_NAME) --ldflags="$(LD_FLAGS)"
+	go build -tags $(GO_TAGS),noembed -o bin/$(EXECUTABLE_NAME) --ldflags="$(LD_FLAGS)" $(ADDITIONAL_FLAGS)
 
 deps:
 	go mod download && go mod verify
