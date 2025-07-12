@@ -1,12 +1,14 @@
 package internal
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/fanonwue/go-short-link/internal/api"
 	"github.com/fanonwue/go-short-link/internal/conf"
 	"github.com/fanonwue/go-short-link/internal/srv"
 	"github.com/fanonwue/go-short-link/internal/util"
+	"net"
 	"net/http"
 	"slices"
 	"strings"
@@ -100,7 +102,7 @@ func addFaviconHandler(iconType conf.FaviconType, mux *http.ServeMux) {
 	}))
 }
 
-func CreateHttpServer(shutdown chan<- error) *http.Server {
+func CreateHttpServer(shutdown chan<- error, ctx context.Context) *http.Server {
 	util.Logger().Infof("Starting HTTP server on port %d", conf.Config().Port)
 
 	mux := http.NewServeMux()
@@ -123,6 +125,9 @@ func CreateHttpServer(shutdown chan<- error) *http.Server {
 		ReadTimeout:  requestTimeout,
 		WriteTimeout: requestTimeout,
 		IdleTimeout:  requestTimeout * 2,
+		BaseContext: func(net.Listener) context.Context {
+			return ctx
+		},
 	}
 
 	go func() {

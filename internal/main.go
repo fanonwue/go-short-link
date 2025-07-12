@@ -393,7 +393,7 @@ func Run(ctx context.Context) error {
 	defer util.Logger().Sync()
 
 	shutdownChan := make(chan error)
-	server = CreateHttpServer(shutdownChan)
+	server = CreateHttpServer(shutdownChan, ctx)
 
 	select {
 	case <-ctx.Done():
