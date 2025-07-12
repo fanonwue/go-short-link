@@ -16,8 +16,9 @@ import (
 
 type HttpMethod string
 
-// BodyFunc A function that provides the content type, the actual body (in bytes) and any error that occurred while producing the body
-type BodyFunc func() (string, *bytes.Buffer, error)
+// BodyFunc A function that provides the content type, the actual body (in bytes)
+// and any error that occurred while producing the body
+type BodyFunc func() (contentType string, body *bytes.Buffer, err error)
 
 const (
 	GET     HttpMethod = http.MethodGet
