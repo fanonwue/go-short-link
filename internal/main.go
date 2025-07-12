@@ -127,10 +127,10 @@ func SetupEnvironment() {
 
 func SetupLogging() {
 	logConfig := zap.NewDevelopmentConfig()
+	logConfig.OutputPaths = []string{"stdout"}
 	if conf.IsProd() {
 		logConfig.Development = false
 		logConfig.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
-		logConfig.OutputPaths = []string{"stdout"}
 	}
 	baseLogger, _ := logConfig.Build()
 	// Make sure to flush logger to avoid mangled output
