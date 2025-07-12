@@ -15,7 +15,6 @@ import (
 
 const (
 	requestTimeout = 10 * time.Second
-	statusEndpoint = "/_status"
 )
 
 var (
@@ -114,15 +113,8 @@ func CreateHttpServer(shutdown chan<- error) *http.Server {
 		addFaviconHandler(iconType, mux)
 	}
 
-	if conf.Config().StatusEndpointEnabled {
-		mux.Handle(statusEndpoint+"/health", wrapHandlerTimeout(StatusHealthHandler))
-		mux.Handle(statusEndpoint+"/info", wrapHandlerTimeout(StatusInfoHandler))
-	}
-
-	if conf.Config().ApiEnabled {
-		for _, endpoint := range api.Endpoints() {
-			mux.Handle(endpoint.Pattern, wrapHandlerTimeout(endpoint.Handler))
-		}
+	for _, endpoint := range api.Endpoints() {
+		mux.Handle(endpoint.Pattern, wrapHandlerTimeout(endpoint.Handler))
 	}
 
 	httpServer := &http.Server{

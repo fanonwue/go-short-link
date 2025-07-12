@@ -36,21 +36,6 @@ type (
 		InfoRequest    bool
 		NoBodyRequest  bool
 	}
-
-	StatusHealthcheck struct {
-		MappingSize int        `json:"mappingSize"`
-		Running     bool       `json:"running"`
-		Healthy     bool       `json:"healthy"`
-		LastUpdate  *time.Time `json:"lastUpdate"`
-	}
-
-	StatusInfo struct {
-		Mapping       state.RedirectMap `json:"mapping"`
-		SpreadsheetId string            `json:"spreadsheetId"`
-		LastUpdate    *time.Time        `json:"lastUpdate"`
-		LastModified  *time.Time        `json:"lastModified"`
-		LastError     string            `json:"lastError,omitempty"`
-	}
 )
 
 const (
@@ -198,42 +183,6 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 
 func FaviconHandler(w http.ResponseWriter, r *http.Request, favicon string) {
 	http.Redirect(w, r, favicon, http.StatusTemporaryRedirect)
-}
-
-func StatusHealthHandler(w http.ResponseWriter, r *http.Request) {
-	status := http.StatusOK
-
-	healthy := repo.RedirectState().LastError() == nil
-	if !healthy {
-		status = http.StatusInternalServerError
-	}
-
-	_ = srv.JsonResponse(w, r, StatusHealthcheck{
-		MappingSize: repo.RedirectState().MappingSize(),
-		Running:     server != nil,
-		Healthy:     healthy,
-		LastUpdate:  srv.StatusResponseTimeMapper(repo.DataSource().LastUpdate()),
-	}, status)
-}
-
-func StatusInfoHandler(w http.ResponseWriter, r *http.Request) {
-	if !checkBasicAuth(w, r) {
-		return
-	}
-
-	lastError := repo.RedirectState().LastError()
-	errorString := ""
-	if lastError != nil {
-		errorString = lastError.Error()
-	}
-
-	_ = srv.JsonResponse(w, r, StatusInfo{
-		Mapping:       repo.RedirectState().CurrentMapping(),
-		SpreadsheetId: repo.DataSource().Id(),
-		LastUpdate:    srv.StatusResponseTimeMapper(repo.DataSource().LastUpdate()),
-		LastModified:  srv.StatusResponseTimeMapper(repo.DataSource().LastModified()),
-		LastError:     errorString,
-	}, http.StatusOK)
 }
 
 func RedirectTargetForRequest(r *http.Request) *ParsedRequest {
