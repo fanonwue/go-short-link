@@ -10,7 +10,8 @@ import (
 )
 
 func main() {
-	appContext, _ := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	appContext, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 	err := internal.Run(appContext)
 	internal.OnExit()
 	if err != nil {
