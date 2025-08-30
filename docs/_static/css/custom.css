@@ -29,3 +29,7 @@ p {
 table td * {
     text-align: left !important;
 }
+
+.wy-nav-content {
+    max-width: 1000px !important;
+}

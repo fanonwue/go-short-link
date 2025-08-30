@@ -10,6 +10,8 @@ project = 'Go-Short-Link'
 copyright = '2025, Fabian Wünderich'
 author = 'Fabian Wünderich'
 
+version = '1'
+
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
