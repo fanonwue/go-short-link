@@ -1,0 +1,31 @@
+body {
+    font-family: sans-serif;
+}
+
+.multi-line-table {
+    width: 100% !important;
+}
+
+.multi-line-table td * {
+    white-space: wrap !important;
+}
+
+/*
+.document {
+    width: 1200px !important;
+}
+*/
+
+
+.highlight {
+    font-family: 'Consolas', 'Lucida Console', monospace;
+}
+
+p {
+    hyphens: auto;
+    text-align: justify
+}
+
+table td * {
+    text-align: left !important;
+}

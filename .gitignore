@@ -5,3 +5,5 @@
 *.pem
 *.key
 secret/
+docs/build
+docs/_build
