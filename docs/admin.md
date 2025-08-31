@@ -233,7 +233,7 @@ environment variable.
 ## Special redirection names
 
 The application supports several different, keyword-like special redirection names. Refer to the following
-[](#special-redirection-names-table) for an overview. In the examples, assume that the server is available via `https://redirect.example.com`.
+[](#special-redirection-names-table) table for an overview. In the examples, assume that the server is available via `https://redirect.example.com`.
 
 (special-redirection-names-table)=
 :::{table} Special redirection names
@@ -241,10 +241,12 @@ The application supports several different, keyword-like special redirection nam
 :align: center
 :class: multi-line-table
 
-| Redirection Name | Meaning                                                                                                                                                                                                                                       |
-|------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| __root           | When calling the server with an empty path, this redirection will be used. In this example, calling `https://redirect.example.com` would trigger this redirection. Note that this requires `APP_ALLOW_ROOT_REDIRECT` to be enabled.           |
-| \<hostname\>     | When the request's hostname matches a record and the path is empty, this redirection will be triggered. Assuming \<hostname\> is replaced with `https://redirect2.example.com`, calling that URL will trigger this record instead of `__root` |
+| Redirection Name | Meaning                                                                                                                                                                                                                                     |
+|------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| __root           | When calling the server with an empty path, this redirection will be used. In this example, calling `https://redirect.example.com` would trigger this redirection. Note that this requires `APP_ALLOW_ROOT_REDIRECT` to be enabled.         |
+| \<hostname\>     | When the request's hostname matches a record and the path is empty, this redirection will be triggered. Assuming `<hostname>` is replaced with `https://redirect2.example.com`, calling that URL will trigger this record instead of `__root` |
 :::
 
-adsad
+As these special names are part of the standard redirect mapping, they can be used in the same way as any other redirection.
+That means, that setting up a redirection for `__root` will also trigger the redirection for `https://redirect.example.com/__root`.
+So if the special redirection name is present in the path, it will be treated as a regular redirection.
