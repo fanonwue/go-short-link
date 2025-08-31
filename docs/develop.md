@@ -114,3 +114,29 @@ mapState.AddHook(func(originalMap state.RedirectMap) state.RedirectMap {
 Once a new redirect mapping has been applied, the registered hook functions will be called in the order they were added.
 
 ## Extending the API
+
+It's easy to extend the API to support additional endpoints. Endpoints are defined in the `internal/api` package. The basis
+of API endpoints is the `Endpoint` struct, which defines a handler function and the pattern that matches the endpoint.
+To add a new endpoint, simply create a new instance of the `Endpoint` struct and add it the `endpoints` slice found in
+the  `createEndpoints()` function. Appropriate middleware will be applied to the handler function, and all endpoints
+will be registered with the HTTP server automatically.
+By default, Endpoints require authentication, but this can be disabled by setting the `Anonymous` field to `true` in the `Endpoint` struct.
+
+The `Endpoint` struct is defined as follows:
+```go
+type Endpoint struct {
+    // Pattern is the URL pattern that this endpoint matches. The matching will be done by the HTTP server.
+    Pattern string
+    // Handler the handler that can handle the incoming request
+    Handler http.HandlerFunc
+    // Anonymous specifies whether anonymous (unauthenticated) access to this endpoint is allowed
+    Anonymous bool
+}
+```
+
+The handler function is a standard `http.HandlerFunc` provided by the standard library that takes a `http.ResponseWriter` and `*http.Request` as arguments.
+The `*http.Request` object contains the parsed URL path and query parameters, and the `http.ResponseWriter` can be used to
+write the response body.
+
+To respond to the request, the `internal/srv` package provides a set of helper functions that can be used to write the response, such
+as `srv.TextResponse()` for raw text responses or `srv.JsonResponse()` for responses that should be marshaled to JSON.
