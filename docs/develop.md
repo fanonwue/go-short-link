@@ -82,10 +82,12 @@ filesystem operations to implement `NeedsUpdate()` and `LastModified()`. When wo
 care needs to be taken to always close created file handles. Go's `defer` functionality is very useful to handle
 this. Accessing the CSV-file through the `withFile()` handler ensures that the file handle will always be closed.
 
+:::{collapse} Example implementation of a CSV-based data source
 ```{literalinclude} ../internal/ds/csv.go
 :language: go
 ```
-
+:::
+<br>
 
 ## Using the new data source
 
