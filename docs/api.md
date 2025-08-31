@@ -2,11 +2,11 @@
 
 The application provides a small API for use with monitoring software and integration with other services.
 
-Endpoints that start with `/_api/` are only available if `APP_ENABLE_API` is set to true. 
-Likewise, the `/_status/` endpoints are only available if `APP_DISABLE_STATUS` is set to false.
+Endpoints under `/_api/` are only available if `APP_ENABLE_API` is true. 
+Likewise, the `/_status/` endpoints are only available if `APP_DISABLE_STATUS` is false.
 It is recommended to make sure access control is enabled by setting a username and password in `APP_ADMIN_USER` and `APP_ADMIN_PASS` respectively.
 Accessing protected endpoints without authentication when access control is enabled will result in a `401 Unauthorized` status code.
-Trying to use the wrong HTTP method will result in a `405 Method Not Allowed` status code.
+Using an unsupported HTTP method on an endpoint returns the `405 Method Not Allowed` status code.
 
 For more information on configuration settings related to the API or status endpoints, see [](#configuration-table).
 
@@ -68,12 +68,12 @@ The response will be a JSON object that conforms to the following example:
 
 This endpoint allows you to forcefully refresh the redirect mapping. When access control is enabled, this endpoint requires HTTP Basic Auth.
 
-| Method        | Path                   | Description                               | Protected            |
-|---------------|------------------------|-------------------------------------------|----------------------|
-| `GET`, `POST` | `/_api/update-mapping` | Forcefully refreshes the redirect mapping | Yes, HTTP Basic Auth |
+| Method        | Path                   | Description                              | Protected            |
+|---------------|------------------------|------------------------------------------|----------------------|
+| `GET`, `POST` | `/_api/update-mapping` | Forces a refresh of the redirect mapping | Yes, HTTP Basic Auth |
 
-If successful, the API responds with a `200 OK` status code and a small, accompanying text, informing
-the caller about the new mapping size. 
+If successful, the API responds with a `200 OK` status code and a short text describing 
+the new mapping size to the caller.
 On failure, the API responds with a `500 Internal Server Error` status code and will write the error into the response body as text.
 
 Please note that this endpoint might change in the future to return an appropriate JSON response.

@@ -84,7 +84,8 @@ To compile for Windows while running on a Linux-based system, this command can b
 GOOS=win CGO_ENABLED=0 TARGET=prod make build
 ```
 
-The resulting binary in the `bin/` directory will be suffixed using the common `.exe` file extension common on Windows-based systems.
+The resulting compiled binary in the `bin/` directory will be suffixed using the common `.exe` file extension common 
+on Windows-based systems.
 
 (configuration)=
 ## Configuration
@@ -96,7 +97,7 @@ For example, on Linux, you can use the `export` command to set environment varia
 
 On startup, the application will check for the presence of a `.env` file in the current working directory. If it is present,
 the application will load the variables from that file, overriding any traditional environment variables. This is an
-alternative way to configure the application
+alternative way to configure the application.
 
 Please refer to the [](#required-configuration-table) table for a list of required variables you should set.
 
