@@ -2,17 +2,19 @@ package api
 
 import (
 	"fmt"
+	"net/http"
+	"slices"
+	"time"
+
 	"github.com/fanonwue/go-short-link/internal/conf"
 	"github.com/fanonwue/go-short-link/internal/repo"
 	"github.com/fanonwue/go-short-link/internal/srv"
 	"github.com/fanonwue/go-short-link/internal/state"
-	"net/http"
-	"slices"
-	"time"
 )
 
 type (
 	Endpoint struct {
+		// Pattern is the URL pattern that this endpoint matches. The matching will be done by the HTTP server.
 		Pattern string
 		// Handler the handler that can handle the incoming request
 		Handler http.HandlerFunc
@@ -42,7 +44,7 @@ const (
 	StatusPrefix = "/_status"
 )
 
-func Endpoints() []Endpoint {
+func createEndpoints() []Endpoint {
 	var apiEndpoints []Endpoint
 	var statusEndpoints []Endpoint
 
@@ -67,8 +69,11 @@ func Endpoints() []Endpoint {
 			})
 		}
 	}
+	return slices.Concat(apiEndpoints, statusEndpoints)
+}
 
-	endpoints := slices.Concat(apiEndpoints, statusEndpoints)
+func Endpoints() []Endpoint {
+	endpoints := createEndpoints()
 	for i := range endpoints {
 		endpoint := &endpoints[i]
 		endpoints[i].Handler = wrapMiddleware(endpoint)
