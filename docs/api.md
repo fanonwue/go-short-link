@@ -4,6 +4,9 @@ The application provides a small API for use with monitoring software and integr
 
 Endpoints under `/_api/` are only available if `APP_ENABLE_API` is true. 
 Likewise, the `/_status/` endpoints are only available if `APP_DISABLE_STATUS` is false.
+The latter type of endpoints is meant as a way to gain read-only access to the application's state without enabling the API.
+They have been present since before the API was introduced, and to keep backwards compatibility, they are still available.
+
 It is recommended to make sure access control is enabled by setting a username and password in `APP_ADMIN_USER` and `APP_ADMIN_PASS` respectively.
 Accessing protected endpoints without authentication when access control is enabled will result in a `401 Unauthorized` status code.
 Using an unsupported HTTP method on an endpoint returns the `405 Method Not Allowed` status code.
