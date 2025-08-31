@@ -13,7 +13,7 @@ nothing breaks.
 Because it’s designed to be lightweight, it runs fast, uses very little memory, and doesn’t pull in extra
 services or heavy frameworks. In practice, that means you get a straightforward, easy‑to‑operate short‑link service: 
 set up the sheet, configure your access to the Google API, point the application at it, and enjoy instant, 
-low‑maintenance link management with no external dependencies to install or maintain.
+low‑maintenance link management with no external (runtime) dependencies to install or maintain.
 
 If you are interested in using this tool, please check out the [Admin guide](admin.md).
 
