@@ -241,10 +241,11 @@ The application supports several different, keyword-like special redirection nam
 :align: center
 :class: multi-line-table
 
-| Redirection Name | Meaning                                                                                                                                                                                                                                     |
-|------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| __root           | When calling the server with an empty path, this redirection will be used. In this example, calling `https://redirect.example.com` would trigger this redirection. Note that this requires `APP_ALLOW_ROOT_REDIRECT` to be enabled.         |
+| Redirection Name | Meaning                                                                                                                                                                                                                                       |
+|------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| __root           | When calling the server with an empty path, this redirection will be used. In this example, calling `https://redirect.example.com` would trigger this redirection. Note that this requires `APP_ALLOW_ROOT_REDIRECT` to be enabled.           |
 | \<hostname\>     | When the request's hostname matches a record and the path is empty, this redirection will be triggered. Assuming `<hostname>` is replaced with `https://redirect2.example.com`, calling that URL will trigger this record instead of `__root` |
+| \<path\>+        | A path ending with a `+` will be treated as a request for redirection information. See [](#requesting-redirect-info) for more information on this behavior.                                                                                   |
 :::
 
 As these special names are part of the standard redirect mapping, they can be used in the same way as any other redirection.
@@ -290,6 +291,7 @@ result in such a response. The resulting page will look similar to the following
 :::
 <br>
 
+(requesting-redirect-info)=
 ### Requesting redirect information
 
 You can view information about a specific redirection by appending a `+` to the end of the path. For example,
