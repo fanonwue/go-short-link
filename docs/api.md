@@ -39,6 +39,7 @@ This endpoint returns information about the application's state. Information inc
 - The last time the mapping was updated
 - The last time the data source has been modified
 - The ID of the currently used spreadsheet (this might change in the future to enable different forms of data sources)
+- The last error that occurred during the last update (field will be omitted if no error occurred)
 
 When access control is enabled, this endpoint requires HTTP Basic Auth.
 
