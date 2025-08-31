@@ -33,3 +33,7 @@ table td * {
 .wy-nav-content {
     max-width: 1000px !important;
 }
+
+details.collapse {
+    cursor: pointer;
+}

@@ -83,6 +83,7 @@ care needs to be taken to always close created file handles. Go's `defer` functi
 this. Accessing the CSV-file through the `withFile()` handler ensures that the file handle will always be closed.
 
 :::{collapse} Example implementation of a CSV-based data source
+:class: collapse
 ```{literalinclude} ../internal/ds/csv.go
 :language: go
 ```

@@ -285,6 +285,7 @@ result in such a response. The resulting page will look similar to the following
 ![404-page](assets/404-page.png)
 
 :::{collapse} Page source
+:class: collapse
 ```{literalinclude} assets/404-page.html
 :language: html
 ```
@@ -300,6 +301,7 @@ accessing `https://redirect.example.com/github+` (notice the `+` at the end) wil
 ![redirect-info-page](assets/redirect-info-page.png)
 
 :::{collapse} Page source
+:class: collapse
 ```{literalinclude} assets/redirect-info-page.html
 :language: html
 ```
