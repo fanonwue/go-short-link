@@ -17,9 +17,10 @@ an HTTP redirect, typically using a temporary or permanent status depending on c
 it responds with a 404. This lookup is intentionally simple and fast, so the majority of CPU time is spent serving traffic
 rather than coordinating state.
 
-The state layer is designed to decouple request handling from update logic. It maintains the current mapping, exposes 
-simple accessors, and manages two buffered channels: one for receiving new mappings and one for receiving errors produced 
-during update operations. Dedicated goroutines listen to these channels. When a new mapping arrives, the listener replaces
+The state layer, found in the package `/internal/state`, is designed to decouple request handling from update logic. 
+It maintains the current mapping, exposes simple accessors, and manages two buffered channels: one for receiving new 
+mappings and one for receiving errors produced during update operations.
+Dedicated goroutines listen to these channels. When a new mapping arrives, the listener replaces
 the current map under a write lock and logs the resulting size for visibility. When an error is received, the state captures
 it as the last-known error, making it available for diagnostics and health checks. Because channels are buffered and updates
 are applied atomically, the system avoids partial states and minimizes the chance of producers blocking on consumers during
@@ -28,9 +29,10 @@ bursts.
 Before a new mapping becomes active, the design allows for hook functions that transform or validate the data. Hooks can
 normalize keys, reject malformed targets, enforce policy, or augment entries. This makes the state layer an extensibility
 point for enforcing operational guarantees without complicating the HTTP handlers. The ability to retrieve a copy of the 
-current mapping enables safe iteration for admin views or debugging without risking mutation of shared state.
+current mapping enables safe iteration for admin views or debugging without risking mutation of the shared state.
 
-In operation, a background updater periodically (or on demand, when using the API) fetches the desired mapping from a source such as a file, 
+In operation, a background updater periodically (or on demand, when using the [API](#forcing-a-redirect-mapping-update)) 
+fetches the desired mapping from a source such as a file, 
 API, or database. It applies hooks to sanitize or validate the content and then publishes the processed map to the state 
 via the update channel, while forwarding any errors to the error channel. The HTTP layer continues serving requests 
 throughout this process, always consulting the latest successfully applied map. If an update fails, the service retains 
@@ -73,7 +75,7 @@ To demonstrate the implementation of a custom data source, an example implementa
 in the following code block (it can be found in the `internal/ds/csv.go` file as well).
 It utilizes Go's native CSV library to handle reading the records, and will use appropriate
 filesystem operations to implement `NeedsUpdate()` and `LastModified()`. When working with file-based providers, special
-care needs to be taken in order to always close created file handles. Go's `defer` functionality is very useful to handle
+care needs to be taken to always close created file handles. Go's `defer` functionality is very useful to handle
 this. Accessing the CSV-file through the `withFile()` handler ensures that the file handle will always be closed.
 
 ```{literalinclude} ../internal/ds/csv.go
@@ -89,7 +91,7 @@ call to `ds.CreateSheetsDataSource()` with your newly created implementation.
 
 ## Hooks
 
-As mentiond in the architecture overview, the state layer allows for hook functions to be registered. These functions
+As mentioned in the architecture overview, the state layer allows for hook functions to be registered. These functions
 are called during updates and can be used to normalize, validate, or augment the data. The following example shows
 how to implement a hook that normalizes keys to lowercase.
 
