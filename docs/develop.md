@@ -53,7 +53,11 @@ or trigger a refresh, though the core redirect path remains independent of these
 
 ## Code Docs
 
-
+An automatically generated documentation of the code can be found on the [Go package mirror](https://pkg.go.dev/github.com/fanonwue/go-short-link).
+Please note that most of the implementation is within the `internal` package, which is not included in the documentation by default.
+You need to explicitly enable it by clicking the "Show internal" buttons. Alternatively, use this 
+[link to the package mirror](https://pkg.go.dev/github.com/fanonwue/go-short-link/internal) to
+directly view the internal package.
 
 ## Creating a new RedirectDataSource
 
