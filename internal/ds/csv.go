@@ -39,8 +39,15 @@ func (ds *CsvDataSource) NeedsUpdate() bool {
 	if !ds.checkModificationTime {
 		return true
 	}
+
+	lastModifiedTime := ds.LastModified()
+	// If the returned time is zero, an error occurred while getting the file info
+	// In this case, we assume that an update is needed
+	if lastModifiedTime.IsZero() {
+		return true
+	}
 	// An update is needed if the file has been modified since the last update
-	return ds.LastModified().After(ds.lastUpdate)
+	return lastModifiedTime.After(ds.lastUpdate)
 }
 
 func (ds *CsvDataSource) FetchRedirectMapping() (state.RedirectMap, error) {
