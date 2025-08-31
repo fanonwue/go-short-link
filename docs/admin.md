@@ -250,3 +250,56 @@ The application supports several different, keyword-like special redirection nam
 As these special names are part of the standard redirect mapping, they can be used in the same way as any other redirection.
 That means, that setting up a redirection for `__root` will also trigger the redirection for `https://redirect.example.com/__root`.
 So if the special redirection name is present in the path, it will be treated as a regular redirection.
+
+
+## Application behavior
+
+Assume you have the following redirections:
+
+| Redirection Name | Target                            |
+|------------------|-----------------------------------|
+| github           | https://github.com/your-name      |
+| test-redirect    | https://example.com/test-redirect |
+
+The server is available via `https://redirect.example.com`. The following section will explain the behavior of the server
+in different scenarios.
+
+Please note that dark-mode settings will be honored when rendering the pages,
+but they have been disabled for demonstration purposes.
+
+### Requesting a redirection
+
+Simple: the server will redirect the client to the target URL. For example, accessing `https://redirect.example.com/github`
+will result in a redirect to `https://github.com/your-name`. This redirection is done via the `Location` header. If enabled
+via the `APP_ENABLE_REDIRECT_BODY` configuration option, the server will also return a stub body containing a message
+indicating that the redirection has been triggered to server as a fallback for clients that do not honor the `Location`
+header.
+
+### Requesting a non-existent redirection
+
+If you request a redirection that does not exist, the server will return a `404 Not Found` response. An appropriate error page will be
+returned, containing some information for the client. Accessing `https://redirect.example.com/non-existent` will
+result in such a response. The resulting page will look similar to the following:
+
+![404-page](assets/404-page.png)
+
+:::{collapse} Page source
+```{literalinclude} assets/404-page.html
+:language: html
+```
+:::
+<br>
+
+### Requesting redirect information
+
+You can view information about a specific redirection by appending a `+` to the end of the path. For example,
+accessing `https://redirect.example.com/github+` (notice the `+` at the end) will result in a page similar to the following:
+
+![redirect-info-page](assets/redirect-info-page.png)
+
+:::{collapse} Page source
+```{literalinclude} assets/redirect-info-page.html
+:language: html
+```
+:::
+<br>

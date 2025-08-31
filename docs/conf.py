@@ -17,7 +17,9 @@ version = '1'
 
 extensions = [
     'myst_parser',
-    'sphinx_rtd_theme'
+    'sphinx_rtd_theme',
+    'sphinx_toolbox.collapse',
+    #'sphinx_togglebutton'
 ]
 
 templates_path = ['_templates']

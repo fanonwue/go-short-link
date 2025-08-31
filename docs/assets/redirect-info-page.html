@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width" />
+    <style>
+        :root {
+            --bg-color: #f0f0f0;
+            --text-color: #000;
+        }
+
+        html {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: sans-serif;
+            padding: 1em;
+            width: 85%;
+            min-width: 8em;
+            max-width: 60em;
+            margin: auto;
+            text-align: center;
+        }
+
+        .link {
+            overflow-wrap: break-word;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        #footer {
+            max-width: 30em;
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            font-size: .8em;
+            margin-top: 3em;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #000;
+                --text-color: #fff;
+            }
+        }
+    </style>
+
+    <!-- note that these icons are set via the APP_FAVICON setting -->
+    <link rel="icon" href="/favicon.png" type="image/png">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+
+
+
+    <title>Redirect Information</title>
+</head>
+<body>
+
+<p>The redirect</p>
+<p class="bold link">/github</p>
+<p>will lead to</p>
+<p class="bold link"><a href="https://github.com/your-name">https://github.com/your-name</a></p>
+
+
+<footer id="footer">
+    <hr>
+    <p>
+        Page rendered at: <span id="render-time" class="timestamp" data-timestamp="2025-08-31T11:38:30Z">
+                2025-08-31T11:38:30Z</span><br>
+        Last mapping update: <span id="update-time" class="timestamp" data-timestamp="2025-08-31T11:20:25Z">
+                2025-08-31T11:20:25Z</span>
+    </p>
+    <p>
+
+
+        <span class="bold">GO-SHORT-LINK</span>
+
+        <br>
+
+        © 2023-2025 ZenDrake
+    </p>
+    <script>
+        "use strict";
+
+        function utcToLocal(timestampString) {
+            return new Date(timestampString).toLocaleString(undefined, {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                timeZoneName: "short"
+            })
+        }
+
+        document.querySelectorAll(".timestamp").forEach(el => {
+            el.innerText = utcToLocal(el.dataset.timestamp ?? el.innerText)
+        })
+
+    </script>
+</footer>
+
+</body>
+</html>
