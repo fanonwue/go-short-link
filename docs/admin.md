@@ -89,8 +89,16 @@ The resulting binary in the `bin/` directory will be suffixed using the common `
 (configuration)=
 ## Configuration
 
-The software can be configured using environment variables. Please refer to the [](#required-configuration-table)
-table for a list of required variables you should set.
+The software can be configured using environment variables. Applying these variables differs depending on your platform and your chosen
+distribution (e.g., using Docker). 
+For example, on Linux, you can use the `export` command to set environment variables. On Windows, you can use the `set` command.
+
+
+On startup, the application will check for the presence of a `.env` file in the current working directory. If it is present,
+the application will load the variables from that file, overriding any traditional environment variables. This is an
+alternative way to configure the application
+
+Please refer to the [](#required-configuration-table) table for a list of required variables you should set.
 
 (required-configuration-table)=
 :::{table} Common configuration variables
