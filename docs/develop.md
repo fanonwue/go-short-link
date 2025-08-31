@@ -139,4 +139,7 @@ The `*http.Request` object contains the parsed URL path and query parameters, an
 write the response body.
 
 To respond to the request, the `internal/srv` package provides a set of helper functions that can be used to write the response, such
-as `srv.TextResponse()` for raw text responses or `srv.JsonResponse()` for responses that should be marshaled to JSON.
+as `srv.TextResponse()` for raw text responses or `srv.JsonResponse()` for responses that should be marshaled to JSON. If
+the response is going to be marshaled to JSON, it needs to be compatible with the 
+standard library's `encoding/json` [package](https://pkg.go.dev/encoding/json). Please be advised that an upgrade to the
+`encoding/json/v2` [package](https://pkg.go.dev/encoding/json/v2) is planned once it's a stable part of the Go standard library.
