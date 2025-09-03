@@ -2,7 +2,7 @@
 const detailsTooltip = 'Click to expand'
 
 document.addEventListener( 'DOMContentLoaded', function() {
-    document.querySelectorAll('details.collapse').forEach(el => {
+    document.querySelectorAll('details.collapse summary').forEach(el => {
         el.setAttribute('title', detailsTooltip)
     })
 
