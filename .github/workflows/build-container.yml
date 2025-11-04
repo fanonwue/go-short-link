@@ -3,9 +3,9 @@ name: build-container
 on:
   push:
     branches: [master]
-  schedule:
-    # do daily builds
-    - cron: '0 0 * * *'
+#  schedule:
+#    # do daily builds
+#    - cron: '0 0 * * *'
 
 env:
   REGISTRY: ghcr.io
