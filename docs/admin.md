@@ -107,13 +107,14 @@ Please refer to the [](#required-configuration-table) table for a list of requir
 :align: center
 :class: multi-line-table
 
-| Variable                             | Default                 | Description                                                                                                                                                                                                                     |
-|--------------------------------------|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| APP_ENV                              | dev                     | The environment the application runs in. For production systems, make sure to set this to "prod" or "production".                                                                                                               |
-| APP_SERVICE_ACCOUNT_CLIENT_EMAIL     | ""                      | The client email of the service account to use. See [](#configuring-google-spreadsheets).                                                                                                                                       |
-| APP_SERVICE_ACCOUNT_PRIVATE_KEY_ID   | ""                      | The ID of the used private key. This field is optional, as the Google API does not enforce it to be present. See [](#configuring-google-spreadsheets).                                                                          |
-| APP_SERVICE_ACCOUNT_PRIVATE_KEY      | ""                      | The PEM-encoded private key. Line breaks must be escaped. Usage of this variable is discouraged. Consider using a key file instead. See [](#configuring-google-spreadsheets).                                                   |
-| APP_SERVICE_ACCOUNT_PRIVATE_KEY_FILE | "secret/privateKey.pem" | Location of the PEM-encoded private key. See [](#configuring-google-spreadsheets).                                                                                                                                              |
+| Variable                             | Default                 | Description                                                                                                                                                                   |
+|--------------------------------------|-------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| APP_ENV                              | dev                     | The environment the application runs in. For production systems, make sure to set this to "prod" or "production".                                                             |
+| APP_SPREADSHEET_ID                   | ""                      | The ID of the spreadsheet you wish to use as a source for the redirect mapping. See [](#spreadsheet-setup).                                                                   |
+| APP_SERVICE_ACCOUNT_CLIENT_EMAIL     | ""                      | The client email of the service account to use. See [](#configuring-google-spreadsheets).                                                                                     |
+| APP_SERVICE_ACCOUNT_PRIVATE_KEY_ID   | ""                      | The ID of the used private key. This field is optional, as the Google API does not enforce it to be present. See [](#configuring-google-spreadsheets).                        |
+| APP_SERVICE_ACCOUNT_PRIVATE_KEY      | ""                      | The PEM-encoded private key. Line breaks must be escaped. Usage of this variable is discouraged. Consider using a key file instead. See [](#configuring-google-spreadsheets). |
+| APP_SERVICE_ACCOUNT_PRIVATE_KEY_FILE | "secret/privateKey.pem" | Location of the PEM-encoded private key. See [](#configuring-google-spreadsheets).                                                                                            |
 :::
 
 In addition to the above variables, the application supports several other configuration options. Please refer to the
@@ -186,6 +187,8 @@ Instead, you can place your private key into a secret file located at `./secret/
 using the `SERVICE_ACCOUNT_PRIVATE_KEY_FILE` environmnent variable). The escaped line breaks (`\n`) can be replaced with actual
 Unix-style line breaks, but the application will handle this as well if this step has not been taken.
 
+(spreadsheet-setup)=
+### Spreadsheet setup
 Finally, you need to create a properly formatted spreadsheet. The server expects a table that is formatted like the one
 shown in the following table.
 
@@ -199,7 +202,7 @@ shown in the following table.
 
 The first two columns are fixed, meaning the application expects column A to always be the redirection name, and column B
 to always be the target. All other columns are not queried, and you can use them to add more information, like a description
-or an automatically generated, copy-able link to those. For explanations on how the special names in the first column work, 
+or an automatically generated, copy-able link to those. For explanations on how the special names in the first column work,
 refer to the [special redirection names](#special-redirection-names) section.
 
 As we are using a service account, you need to grant that service account access to the spreadsheet. This is done by simply
