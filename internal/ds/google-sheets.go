@@ -3,13 +3,6 @@ package ds
 import (
 	"context"
 	"encoding/pem"
-	"github.com/fanonwue/go-short-link/internal/state"
-	"github.com/fanonwue/go-short-link/internal/util"
-	"golang.org/x/oauth2/google"
-	"golang.org/x/oauth2/jwt"
-	"google.golang.org/api/drive/v3"
-	"google.golang.org/api/option"
-	"google.golang.org/api/sheets/v4"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,6 +10,15 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/fanonwue/go-short-link/internal/state"
+	"github.com/fanonwue/go-short-link/internal/util"
+	"github.com/fanonwue/goutils/logging"
+	"golang.org/x/oauth2/google"
+	"golang.org/x/oauth2/jwt"
+	"google.golang.org/api/drive/v3"
+	"google.golang.org/api/option"
+	"google.golang.org/api/sheets/v4"
 )
 
 type GoogleAuthConfig struct {
@@ -83,12 +85,12 @@ func getServiceAccountPrivateKey() []byte {
 	var pemBlock, _ = pem.Decode(keyData)
 
 	if pemBlock == nil || !strings.Contains(pemBlock.Type, "PRIVATE KEY") {
-		util.Logger().Panicf("Key is not a valid PEM-formatted private key")
+		logging.Panicf("Key is not a valid PEM-formatted private key")
 		return nil
 	}
 
 	if len(pemBlock.Bytes) < 100 {
-		util.Logger().Warnf("Keyfile smaller than 100 Bytes! This is probably unintended. Length: %d", len(keyData))
+		logging.Warnf("Keyfile smaller than 100 Bytes! This is probably unintended. Length: %d", len(keyData))
 	}
 
 	return pemBlock.Bytes
@@ -104,21 +106,21 @@ func readPrivateKeyData() []byte {
 		keyFile := os.Getenv(util.PrefixedEnvVar("SERVICE_ACCOUNT_PRIVATE_KEY_FILE"))
 		if len(keyFile) == 0 {
 			// Assume standard keyfile location
-			util.Logger().Debugf("Keyfile location not set, assuming default location: %s", defaultKeyFilePath)
+			logging.Debugf("Keyfile location not set, assuming default location: %s", defaultKeyFilePath)
 			keyFile = defaultKeyFilePath
 		}
 
 		keyFile, err := filepath.Abs(keyFile)
 		if err != nil {
-			util.Logger().Panicf("Could not create absolute path from path: %v", err)
+			logging.Panicf("Could not create absolute path from path: %v", err)
 		}
 
-		util.Logger().Infof("Trying to read keyfile from path: %s", keyFile)
+		logging.Infof("Trying to read keyfile from path: %s", keyFile)
 		fileContent, err := os.ReadFile(keyFile)
 		if err != nil {
-			util.Logger().Panicf("Error reading keyfile: %v", err)
+			logging.Panicf("Error reading keyfile: %v", err)
 		}
-		util.Logger().Debugf("Read keyfile, length: %d bytes", len(fileContent))
+		logging.Debugf("Read keyfile, length: %d bytes", len(fileContent))
 
 		keyData = fileContent
 	}
@@ -167,7 +169,7 @@ func (ds *GoogleSheetsDataSource) apiScopes() []string {
 func (ds *GoogleSheetsDataSource) postCreate() {
 	fileWebLink, err := ds.SpreadsheetWebLink()
 	if err == nil {
-		util.Logger().Infof("Using document available at: %s", fileWebLink)
+		logging.Infof("Using document available at: %s", fileWebLink)
 	}
 }
 
@@ -217,7 +219,7 @@ func (ds *GoogleSheetsDataSource) DriveService() *drive.Service {
 		ctx := ds.serviceContext()
 		newService, err := drive.NewService(ctx, ds.serviceClientOpts()...)
 		if err != nil {
-			util.Logger().Panicf("Could not create drive service: %v", err)
+			logging.Panicf("Could not create drive service: %v", err)
 		} else {
 			ds.driveService = newService
 		}
@@ -229,7 +231,7 @@ func (ds *GoogleSheetsDataSource) SheetsService() *sheets.Service {
 	if ds.sheetsService == nil {
 		newService, err := sheets.NewService(ds.serviceContext(), ds.serviceClientOpts()...)
 		if err != nil {
-			util.Logger().Panicf("Could not create sheets service: %v", err)
+			logging.Panicf("Could not create sheets service: %v", err)
 		} else {
 			ds.sheetsService = newService
 		}
@@ -263,7 +265,7 @@ func (ds *GoogleSheetsDataSource) SpreadsheetWebLink() (string, error) {
 		Do()
 
 	if err != nil {
-		util.Logger().Warnf("Could not determine webViewLink for Spreadsheet '%s': %v", ds.config.SpreadsheetId, err)
+		logging.Warnf("Could not determine webViewLink for Spreadsheet '%s': %v", ds.config.SpreadsheetId, err)
 		return "", err
 	}
 
@@ -292,14 +294,14 @@ func (ds *GoogleSheetsDataSource) updateLastModified() (time.Time, error) {
 		Context(ctx).
 		Do()
 	if err != nil {
-		util.Logger().Errorf("Could not determine modifiedTime for Spreadsheet '%s': %v", ds.config.SpreadsheetId, err)
+		logging.Errorf("Could not determine modifiedTime for Spreadsheet '%s': %v", ds.config.SpreadsheetId, err)
 		return time.Time{}, err
 	}
 
 	modifiedTimeRaw := file.ModifiedTime
 	modifiedTime, err := time.Parse(time.RFC3339, modifiedTimeRaw)
 	if err != nil {
-		util.Logger().Errorf("Could not parse RFC3339 timestamp %s: %v", modifiedTimeRaw, err)
+		logging.Errorf("Could not parse RFC3339 timestamp %s: %v", modifiedTimeRaw, err)
 		return time.Time{}, err
 	}
 
@@ -310,7 +312,7 @@ func (ds *GoogleSheetsDataSource) updateLastModified() (time.Time, error) {
 	ds.lastModified = modifiedTimeUtc
 
 	if oldTime.UnixMilli() != modifiedTimeUtc.UnixMilli() {
-		util.Logger().Debugf("Updated last modified time to %v", modifiedTimeUtc)
+		logging.Debugf("Updated last modified time to %v", modifiedTimeUtc)
 	}
 
 	return ds.lastModified, nil
@@ -363,7 +365,7 @@ func (ds *GoogleSheetsDataSource) fetchRedirectMappingInternal() (state.Redirect
 		Do()
 
 	if err != nil {
-		util.Logger().Errorf("Unable to retrieve data from sheet: %v", err)
+		logging.Errorf("Unable to retrieve data from sheet: %v", err)
 		return nil, time.Time{}, err
 	}
 

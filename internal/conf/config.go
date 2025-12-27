@@ -2,7 +2,10 @@ package conf
 
 import (
 	"fmt"
+
 	"github.com/fanonwue/go-short-link/internal/util"
+	"github.com/fanonwue/goutils/logging"
+
 	"os"
 	"slices"
 	"strconv"
@@ -98,7 +101,7 @@ func (t FaviconType) Mime() string {
 		return "image/png"
 	}
 
-	util.Logger().Panicf("Unknown favicon type: %s", t)
+	logging.Panicf("Unknown favicon type: %s", t)
 	return ""
 }
 
@@ -139,7 +142,7 @@ func CreateAppConfig() *AppConfig {
 		updatePeriod = defaultUpdatePeriod
 	}
 	if updatePeriod < minimumUpdatePeriod {
-		util.Logger().Warnf(
+		logging.Warnf(
 			"UPDATE_PERIOD set to less than %d seconds (minimum), setting it to %d seconds (default)",
 			minimumUpdatePeriod, defaultUpdatePeriod)
 		updatePeriod = defaultUpdatePeriod
@@ -206,12 +209,12 @@ func createAdminCredentials() *AdminCredentials {
 
 	userHash, err := util.HashPassword([]byte(user))
 	if err != nil {
-		util.Logger().Panicf("Failed to hash admin credentials USER: %v", err)
+		logging.Panicf("Failed to hash admin credentials USER: %v", err)
 	}
 
 	passHash, err := util.HashPassword([]byte(pass))
 	if err != nil {
-		util.Logger().Panicf("Failed to hash admin credentials PASS: %v", err)
+		logging.Panicf("Failed to hash admin credentials PASS: %v", err)
 	}
 
 	return &AdminCredentials{

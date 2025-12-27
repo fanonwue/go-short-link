@@ -3,10 +3,12 @@ package repo
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/fanonwue/go-short-link/internal/conf"
 	"github.com/fanonwue/go-short-link/internal/ds"
 	"github.com/fanonwue/go-short-link/internal/state"
-	"github.com/fanonwue/go-short-link/internal/util"
+	"github.com/fanonwue/goutils/logging"
+
 	"os"
 	"path/filepath"
 )
@@ -31,7 +33,7 @@ func Setup(ctx context.Context) {
 
 func DataSource() ds.RedirectDataSource {
 	if dataSource == nil {
-		util.Logger().Panic("Redirect data source not set up")
+		logging.Panic("Redirect data source not set up")
 	}
 	return dataSource
 }
@@ -45,7 +47,7 @@ func UpdateRedirectMappingDefault(force bool) (state.RedirectMap, error) {
 }
 func UpdateRedirectMapping(target chan<- state.RedirectMap, force bool) (state.RedirectMap, error) {
 	if !force && !DataSource().NeedsUpdate() && RedirectState().LastError() == nil {
-		util.Logger().Debugf("File has not changed since last update, skipping update")
+		logging.Debugf("File has not changed since last update, skipping update")
 		return nil, nil
 	}
 
@@ -55,16 +57,16 @@ func UpdateRedirectMapping(target chan<- state.RedirectMap, force bool) (state.R
 
 	fetchedMapping, fetchErr := DataSource().FetchRedirectMapping()
 	if fetchErr != nil {
-		util.Logger().Warnf("Error fetching new redirect mapping: %s", fetchErr)
+		logging.Warnf("Error fetching new redirect mapping: %s", fetchErr)
 		if conf.Config().UseFallbackFile() {
 			fallbackMap, err := readFallbackFileLog(conf.Config().FallbackFile)
 			if err != nil {
 				return nil, err
 			}
 			fetchedMapping = fallbackMap
-			util.Logger().Infof("Read from fallback file")
+			logging.Infof("Read from fallback file")
 		} else {
-			util.Logger().Warnf("Fallback file disabled")
+			logging.Warnf("Fallback file disabled")
 			return nil, fetchErr
 		}
 	}
@@ -99,7 +101,7 @@ func applyHooks(newMap state.RedirectMap) state.RedirectMap {
 
 func writeFallbackFile(path string, newMapping state.RedirectMap) error {
 	if len(path) == 0 {
-		util.Logger().Debugf("Fallback file path is empty, skipping write")
+		logging.Debugf("Fallback file path is empty, skipping write")
 		return nil
 	}
 
@@ -135,7 +137,7 @@ func writeFallbackFile(path string, newMapping state.RedirectMap) error {
 func writeFallbackFileLog(path string, newMapping state.RedirectMap) error {
 	err := writeFallbackFile(path, newMapping)
 	if err != nil {
-		util.Logger().Warnf("Error writing fallback file: %v", err)
+		logging.Warnf("Error writing fallback file: %v", err)
 	}
 	return err
 }
@@ -143,14 +145,14 @@ func writeFallbackFileLog(path string, newMapping state.RedirectMap) error {
 func readFallbackFile(path string) (state.RedirectMap, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		util.Logger().Warnf("Error reading fallback file: %v", err)
+		logging.Warnf("Error reading fallback file: %v", err)
 		return nil, err
 	}
 
 	var entries []FallbackFileEntry
 	err = json.Unmarshal(data, &entries)
 	if err != nil {
-		util.Logger().Warnf("Error unmarshaling fallback file: %v", err)
+		logging.Warnf("Error unmarshaling fallback file: %v", err)
 		return nil, err
 	}
 
@@ -164,10 +166,10 @@ func readFallbackFile(path string) (state.RedirectMap, error) {
 }
 
 func readFallbackFileLog(path string) (state.RedirectMap, error) {
-	util.Logger().Infof("Reading fallback file")
+	logging.Infof("Reading fallback file")
 	fallbackMap, fallbackErr := readFallbackFile(path)
 	if fallbackErr != nil {
-		util.Logger().Warnf("Could not read fallback file %s: %v", conf.Config().FallbackFile, fallbackErr)
+		logging.Warnf("Could not read fallback file %s: %v", conf.Config().FallbackFile, fallbackErr)
 	}
 	return fallbackMap, fallbackErr
 }

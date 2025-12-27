@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/fanonwue/go-short-link/internal/api"
-	"github.com/fanonwue/go-short-link/internal/conf"
-	"github.com/fanonwue/go-short-link/internal/srv"
-	"github.com/fanonwue/go-short-link/internal/util"
 	"net"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/fanonwue/go-short-link/internal/api"
+	"github.com/fanonwue/go-short-link/internal/conf"
+	"github.com/fanonwue/go-short-link/internal/srv"
+	"github.com/fanonwue/goutils/logging"
 )
 
 const (
@@ -103,7 +104,7 @@ func addFaviconHandler(iconType conf.FaviconType, mux *http.ServeMux) {
 }
 
 func CreateHttpServer(shutdown chan<- error, ctx context.Context) *http.Server {
-	util.Logger().Infof("Starting HTTP server on port %d", conf.Config().Port)
+	logging.Infof("Starting HTTP server on port %d", conf.Config().Port)
 
 	mux := http.NewServeMux()
 
@@ -133,9 +134,9 @@ func CreateHttpServer(shutdown chan<- error, ctx context.Context) *http.Server {
 	go func() {
 		defer close(shutdown)
 		err := httpServer.ListenAndServe()
-		util.Logger().Debugf("HTTP Server closed")
+		logging.Debugf("HTTP Server closed")
 		if !errors.Is(err, http.ErrServerClosed) {
-			util.Logger().Errorf("Error creating server: %v", err)
+			logging.Errorf("Error creating server: %v", err)
 			shutdown <- err
 		} else {
 			shutdown <- nil

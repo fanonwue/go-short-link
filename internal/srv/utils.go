@@ -6,9 +6,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+
 	"github.com/fanonwue/go-short-link/internal/conf"
 	"github.com/fanonwue/go-short-link/internal/tmpl/minify"
 	"github.com/fanonwue/go-short-link/internal/util"
+	"github.com/fanonwue/goutils/logging"
+
 	"net/http"
 	"strconv"
 	"time"
@@ -68,7 +71,7 @@ func StatusResponse(
 	contentType, body, err := bodyFunc()
 
 	if err != nil {
-		util.Logger().Errorf("Error writing status data to buffer: %v", err)
+		logging.Errorf("Error writing status data to buffer: %v", err)
 		http.Error(w, "Unknown Error", http.StatusInternalServerError)
 		return err
 	}
@@ -83,7 +86,7 @@ func StatusResponse(
 	if WithBodyRequest(r) {
 		_, err = body.WriteTo(w)
 		if err != nil {
-			util.Logger().Errorf("Error writing status data to response body: %v", err)
+			logging.Errorf("Error writing status data to response body: %v", err)
 		}
 		return err
 	}
@@ -124,7 +127,7 @@ func HtmlResponse(w http.ResponseWriter, withBody bool, status int, buffer *byte
 		newBuf := util.NewBuffer(buffer.Len())
 		_, err := newBuf.ReadFrom(minify.FromReader(buffer))
 		if err != nil {
-			util.Logger().Errorf("Could not minify response: %v", err)
+			logging.Errorf("Could not minify response: %v", err)
 		}
 		buffer = newBuf
 	}
@@ -141,7 +144,7 @@ func HtmlResponse(w http.ResponseWriter, withBody bool, status int, buffer *byte
 	if withBody {
 		_, err := buffer.WriteTo(w)
 		if err != nil {
-			util.Logger().Errorf("Could not write response body: %v", err)
+			logging.Errorf("Could not write response body: %v", err)
 		}
 	}
 }

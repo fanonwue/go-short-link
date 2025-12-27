@@ -10,7 +10,7 @@ import (
 func init() {
 	webRoot, err := os.OpenRoot("./web")
 	if err != nil {
-		util.Logger().Fatalf("Failed to read web templates: %v", err)
+		logging.Fatalf("Failed to read web templates: %v", err)
 	}
 	templates = webRoot.FS()
 }

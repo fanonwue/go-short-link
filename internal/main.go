@@ -2,6 +2,12 @@ package internal
 
 import (
 	"context"
+	"html/template"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/fanonwue/go-short-link/internal/conf"
 	"github.com/fanonwue/go-short-link/internal/repo"
 	"github.com/fanonwue/go-short-link/internal/srv"
@@ -9,13 +15,8 @@ import (
 	"github.com/fanonwue/go-short-link/internal/tmpl"
 	"github.com/fanonwue/go-short-link/internal/tmpl/minify"
 	"github.com/fanonwue/go-short-link/internal/util"
+	"github.com/fanonwue/goutils/logging"
 	"github.com/joho/godotenv"
-	"go.uber.org/zap"
-	"html/template"
-	"net/http"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type (
@@ -45,7 +46,6 @@ const (
 
 var (
 	server               *http.Server
-	logger               *zap.SugaredLogger
 	notFoundTemplate     *template.Template
 	redirectInfoTemplate *template.Template
 	quitUpdateJob        = make(chan bool)
@@ -77,8 +77,8 @@ func Setup(appContext context.Context) {
 	SetupEnvironment()
 	SetupLogging()
 
-	util.Logger().Infof("----- STARTING GO-SHORT-LINK SERVER -----")
-	util.Logger().Infof("Running in production mode: %s", strconv.FormatBool(conf.IsProd()))
+	logging.Infof("----- STARTING GO-SHORT-LINK SERVER -----")
+	logging.Infof("Running in production mode: %s", strconv.FormatBool(conf.IsProd()))
 
 	conf.CreateAppConfig()
 	repo.Setup(appContext)
@@ -104,15 +104,15 @@ func Setup(appContext context.Context) {
 
 	redirectInfoTemplate, err = tpc.ParseTemplateFile(redirectInfoTemplatePath)
 	if err != nil {
-		util.Logger().Warnf("Could not load redirect-info template file %s: %v", redirectInfoTemplatePath, err)
+		logging.Warnf("Could not load redirect-info template file %s: %v", redirectInfoTemplatePath, err)
 	}
 
 	if conf.Config().UseFallbackFile() {
-		util.Logger().Infof("Fallback file enabled at path: %s", conf.Config().FallbackFile)
+		logging.Infof("Fallback file enabled at path: %s", conf.Config().FallbackFile)
 	}
 
 	if minify.EnableMinification {
-		util.Logger().Info("Response minification enabled")
+		logging.Info("Response minification enabled")
 	}
 
 	addDefaultRedirectMapHooks(repo.RedirectState())
@@ -126,25 +126,8 @@ func SetupEnvironment() {
 }
 
 func SetupLogging() {
-	logConfig := zap.NewDevelopmentConfig()
-	logConfig.OutputPaths = []string{"stdout"}
-	if conf.IsProd() {
-		logConfig.Development = false
-		logConfig.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
-	}
-	baseLogger, _ := logConfig.Build()
-	// Make sure to flush logger to avoid mangled output
-	defer baseLogger.Sync()
-	logger = baseLogger.Sugar()
-
-	// Set zap's globals
-	zap.ReplaceGlobals(baseLogger)
-	util.SetLogger(logger)
-
-	// Set global logger as well
-	_, err := zap.RedirectStdLogAt(baseLogger, logConfig.Level.Level())
-	if err != nil {
-		util.Logger().Errorf("Could not set global logger: %v", err)
+	if !conf.IsProd() {
+		_ = logging.SetLogLevel(logging.LevelDebug)
 	}
 }
 
@@ -177,7 +160,7 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	if conf.LogResponseTimes {
 		endTime := time.Now()
 		duration := endTime.Sub(startTime)
-		util.Logger().Debugf("Request evaluation took %dµs", duration.Microseconds())
+		logging.Debugf("Request evaluation took %dµs", duration.Microseconds())
 	}
 }
 
@@ -255,7 +238,7 @@ func RedirectInfoHandler(w http.ResponseWriter, pr *ParsedRequest) {
 	})
 
 	if err != nil {
-		util.Logger().Errorf("Could not render redirect-info template: %v", err)
+		logging.Errorf("Could not render redirect-info template: %v", err)
 	}
 
 	etagData := redirectEtag(pr.NormalizedPath, pr.Target, "info")
@@ -278,7 +261,7 @@ func NotFoundHandler(w http.ResponseWriter, pr *ParsedRequest) {
 	})
 
 	if err != nil {
-		util.Logger().Errorf("Could not render not-found template: %v", err)
+		logging.Errorf("Could not render not-found template: %v", err)
 	}
 
 	srv.HtmlResponse(w, !pr.NoBodyRequest, http.StatusNotFound, renderedBuf, "")
@@ -302,13 +285,13 @@ func redirectEtag(requestPath string, target string, suffix string) string {
 }
 
 func StartBackgroundUpdates(ctx context.Context) {
-	util.Logger().Infof("Starting background updates at an interval of %.0f seconds", conf.Config().UpdatePeriod.Seconds())
+	logging.Infof("Starting background updates at an interval of %.0f seconds", conf.Config().UpdatePeriod.Seconds())
 	ticker := time.NewTicker(conf.Config().UpdatePeriod)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
-			util.Logger().Info("Update context cancelled")
+			logging.Info("Update context cancelled")
 			return
 		case <-ticker.C:
 			repo.UpdateRedirectMappingChannels(nil, nil, false)
@@ -340,7 +323,7 @@ func addDefaultRedirectMapHooks(mapState *state.RedirectMapState) {
 		}
 	}
 
-	util.Logger().Debug("Adding update hook to strip leading and trailing slashes from redirect paths")
+	logging.Debug("Adding update hook to strip leading and trailing slashes from redirect paths")
 	mapState.AddHook(func(originalMap state.RedirectMap) state.RedirectMap {
 		for key := range originalMap {
 			modifyKey(originalMap, key, func(s string) string {
@@ -351,7 +334,7 @@ func addDefaultRedirectMapHooks(mapState *state.RedirectMapState) {
 	})
 
 	if redirectInfoEndpointEnabled() {
-		util.Logger().Debug("Adding update hook to remove info-request suffix from redirect paths")
+		logging.Debug("Adding update hook to remove info-request suffix from redirect paths")
 		mapState.AddHook(func(originalMap state.RedirectMap) state.RedirectMap {
 			// Edit map in place
 			for key := range originalMap {
@@ -364,7 +347,7 @@ func addDefaultRedirectMapHooks(mapState *state.RedirectMapState) {
 	}
 
 	if conf.Config().IgnoreCaseInPath {
-		util.Logger().Debug("Adding update hook to make redirect paths lowercase")
+		logging.Debug("Adding update hook to make redirect paths lowercase")
 		mapState.AddHook(func(originalMap state.RedirectMap) state.RedirectMap {
 			// Edit map in place
 			for key := range originalMap {
@@ -378,19 +361,16 @@ func addDefaultRedirectMapHooks(mapState *state.RedirectMapState) {
 }
 
 func OnExit(messages ...string) {
-	defer util.Logger().Sync()
 	if len(messages) == 0 {
 		messages = append(messages, "Server stopped")
 	}
 	for i := range messages {
-		util.Logger().Infof(messages[i])
+		logging.Infof(messages[i])
 	}
 }
 
 func Run(ctx context.Context) error {
 	Setup(ctx)
-	// Flush log buffer before exiting
-	defer util.Logger().Sync()
 
 	shutdownChan := make(chan error)
 	server = CreateHttpServer(shutdownChan, ctx)
@@ -399,7 +379,7 @@ func Run(ctx context.Context) error {
 	case <-ctx.Done():
 		shutdownContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		util.Logger().Infof("Shutting down HTTP server")
+		logging.Infof("Shutting down HTTP server")
 		err := server.Shutdown(shutdownContext)
 		if err != nil {
 			return err

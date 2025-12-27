@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/fanonwue/go-short-link/internal/state"
-	"github.com/fanonwue/go-short-link/internal/util"
+	"github.com/fanonwue/goutils/logging"
 )
 
 // CsvDataSource is a very simple implementation of the RedirectDataSource interface.
@@ -28,7 +28,7 @@ func (ds *CsvDataSource) LastModified() time.Time {
 		return f.Stat()
 	})
 	if err != nil {
-		util.Logger().Errorf("Could not get file info: %v", err)
+		logging.Errorf("Could not get file info: %v", err)
 		return time.Time{}
 	}
 	return fileInfo.ModTime().UTC()
