@@ -96,6 +96,9 @@ The application does not support configurable data sources at this point. To use
 will need to modify the `Setup()` function inside `internal/repo/repo.go`. It should be enough to simply replace the
 call to `ds.CreateSheetsDataSource()` with your newly created implementation.
 
+A pluginable data source architecture is planned for future releases. Go provides a nice way to implement this using
+[plugins](https://pkg.go.dev/plugin).
+
 ## Hooks
 
 As mentioned in the architecture overview, the state layer allows for hook functions to be registered. These functions
