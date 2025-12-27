@@ -9,6 +9,9 @@ import (
 
 var envVarHelper = goutils.NewEnvVarHelper("APP_")
 
+func EnvHelper() goutils.EnvVarHelper {
+	return envVarHelper
+}
 func PrefixedEnvVar(envVar string) string {
 	return envVarHelper.PrefixVar(envVar)
 }

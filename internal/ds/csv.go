@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fanonwue/go-short-link/internal/state"
+	"github.com/fanonwue/goutils"
 	"github.com/fanonwue/goutils/logging"
 )
 
@@ -92,17 +93,15 @@ func fetchRedirectMappingInternal(ds *CsvDataSource, f fs.File) (state.RedirectM
 	return redirectMap, nil
 }
 
+// withFile is a helper function that opens a file and calls a callback function with it. Internally, it uses [goutils.WithFile]
+// to ensure that the file is closed after the callback has finished.
+//
+// Due to the generic nature of this function, it cannot be turned into a method on [CsvDataSource]. Go does not allow generic methods
+// on types without type parameters, like [CsvDataSource]
 func withFile[T any](ds *CsvDataSource, callback func(f fs.File) (T, error)) (T, error) {
-	var result T
-	f, err := os.Open(ds.filePath)
-	if err != nil {
-		return result, err
-	}
-	// Defer closing the file
-	defer f.Close()
-
-	result, err = callback(f)
-	return result, err
+	return goutils.WithFile(ds.filePath, func(file *os.File) (T, error) {
+		return callback(file)
+	})
 }
 
 func CreateCsvDataSource(filePath string, checkModificationTime bool) *CsvDataSource {
