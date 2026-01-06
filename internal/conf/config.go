@@ -3,6 +3,7 @@ package conf
 import (
 	"fmt"
 
+	"github.com/fanonwue/go-short-link/internal/build"
 	"github.com/fanonwue/go-short-link/internal/util"
 	"github.com/fanonwue/goutils/logging"
 
@@ -63,8 +64,9 @@ const (
 )
 
 var (
-	currentConfig *AppConfig
-	isProd        bool
+	currentConfig  *AppConfig
+	isProd         bool
+	buildTimestamp time.Time
 )
 
 func (ac *AppConfig) UseFallbackFile() bool {
@@ -120,6 +122,12 @@ func init() {
 	prodEnvValues := []string{"prod", "production"}
 	envValue := strings.ToLower(os.Getenv(util.PrefixedEnvVar("ENV")))
 	isProd = slices.Contains(prodEnvValues, envValue)
+	createdBuildTimestamp, err := createBuildTimestamp()
+	if err != nil {
+		logging.Errorf("Failed to parse build timestamp, falling back to current time: %v", err)
+		createdBuildTimestamp = time.Now()
+	}
+	buildTimestamp = createdBuildTimestamp
 }
 
 func IsProd() bool {
@@ -225,4 +233,19 @@ func createAdminCredentials() *AdminCredentials {
 		UserHash: userHash,
 		PassHash: passHash,
 	}
+}
+
+func createBuildTimestamp() (time.Time, error) {
+	if build.Timestamp == "" {
+		logging.Warn("Build timestamp not set, using current time")
+		return time.Now(), nil
+	}
+
+	return time.Parse(build.TimestampFormat, build.Timestamp)
+}
+
+// BuildTimestamp returns the build timestamp (compile time). The second parameter indicates whether the timestamp was set
+// or not. If the timestamp was not set, the current time will be returned and the second parameter will be false.
+func BuildTimestamp() (ts time.Time, validTimestamp bool) {
+	return buildTimestamp, build.Timestamp != ""
 }

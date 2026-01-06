@@ -80,6 +80,10 @@ func Setup(appContext context.Context) {
 	SetupLogging()
 
 	logging.Infof("----- STARTING GO-SHORT-LINK SERVER -----")
+	buildTime, valid := conf.BuildTimestamp()
+	if valid {
+		logging.Infof("Build info: %s", buildTime)
+	}
 	logging.Infof("Running in production mode: %s", strconv.FormatBool(conf.IsProd()))
 
 	conf.CreateAppConfig()
