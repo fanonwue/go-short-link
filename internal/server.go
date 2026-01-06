@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"slices"
@@ -13,6 +14,7 @@ import (
 	"github.com/fanonwue/go-short-link/internal/api"
 	"github.com/fanonwue/go-short-link/internal/conf"
 	"github.com/fanonwue/go-short-link/internal/srv"
+	"github.com/fanonwue/go-short-link/internal/tmpl"
 	"github.com/fanonwue/goutils/logging"
 )
 
@@ -103,13 +105,39 @@ func addFaviconHandler(iconType conf.FaviconType, mux *http.ServeMux) {
 	}))
 }
 
+func defaultHandlerWithAssets(defaultHandler http.HandlerFunc) http.HandlerFunc {
+	if !conf.Config().UseAssets {
+		return defaultHandler
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		file, err := tmpl.AssetsFS().Open(r.URL.Path)
+		if err != nil {
+			defaultHandler(w, r)
+			return
+		}
+		defer file.Close()
+
+		stat, _ := file.Stat()
+		reader, ok := file.(io.ReadSeeker)
+		if !ok {
+			logging.Errorf("File does not implement io.ReadSeeker: %s", r.URL.Path)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		srv.AddDefaultHeadersAssets(w.Header())
+		http.ServeContent(w, r, r.URL.Path, stat.ModTime(), reader)
+	}
+}
+
 func CreateHttpServer(shutdown chan<- error, ctx context.Context) *http.Server {
 	logging.Infof("Starting HTTP server on port %d", conf.Config().Port)
 
 	mux := http.NewServeMux()
 
+	defaultHandler := wrapHandlerTimeout(defaultHandlerWithAssets(ServerHandler))
+
 	// Default handler
-	mux.Handle("/", wrapHandlerTimeout(ServerHandler))
+	mux.Handle("/", defaultHandler)
 
 	// Favicons Handler
 	for iconType := range conf.Config().Favicons {
@@ -118,6 +146,10 @@ func CreateHttpServer(shutdown chan<- error, ctx context.Context) *http.Server {
 
 	for _, endpoint := range api.Endpoints() {
 		mux.Handle(endpoint.Pattern, wrapHandlerTimeout(endpoint.Handler))
+	}
+
+	for _, wellKnownFile := range wellKnownFiles() {
+		mux.Handle(wellKnownFile, http.StripPrefix(srv.WellKnownPrefix, defaultHandler))
 	}
 
 	httpServer := &http.Server{
@@ -142,6 +174,9 @@ func CreateHttpServer(shutdown chan<- error, ctx context.Context) *http.Server {
 			shutdown <- nil
 		}
 	}()
-
 	return httpServer
+}
+
+func wellKnownFiles() []string {
+	return []string{srv.WellKnownPrefix + "/security.txt"}
 }

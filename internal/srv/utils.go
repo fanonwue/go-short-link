@@ -23,6 +23,8 @@ type HttpMethod string
 // and any error that occurred while producing the body
 type BodyFunc func() (contentType string, body *bytes.Buffer, err error)
 
+const WellKnownPrefix = "/.well-known"
+
 const (
 	GET     HttpMethod = http.MethodGet
 	POST    HttpMethod = http.MethodPost

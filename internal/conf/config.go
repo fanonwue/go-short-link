@@ -22,21 +22,23 @@ type (
 	}
 
 	AppConfig struct {
-		IgnoreCaseInPath      bool
-		ShowServerHeader      bool
-		Port                  uint16
-		UpdatePeriod          time.Duration
-		HttpCacheMaxAge       uint32
-		CacheControlHeader    string
-		StatusEndpointEnabled bool
-		UseETag               bool
-		UseRedirectBody       bool
-		AdminCredentials      *AdminCredentials
-		Favicons              map[FaviconType]string
-		AllowRootRedirect     bool
-		FallbackFile          string
-		ShowRepositoryLink    bool
-		ApiEnabled            bool
+		IgnoreCaseInPath         bool
+		ShowServerHeader         bool
+		Port                     uint16
+		UpdatePeriod             time.Duration
+		HttpCacheMaxAge          uint32
+		CacheControlHeader       string
+		AssetsCacheControlHeader string
+		FallbackFile             string
+		Favicons                 map[FaviconType]string
+		UseAssets                bool
+		UseETag                  bool
+		UseRedirectBody          bool
+		AllowRootRedirect        bool
+		ShowRepositoryLink       bool
+		StatusEndpointEnabled    bool
+		ApiEnabled               bool
+		AdminCredentials         *AdminCredentials
 	}
 
 	FaviconEntry struct {
@@ -154,21 +156,23 @@ func CreateAppConfig() *AppConfig {
 	}
 
 	currentConfig = &AppConfig{
-		IgnoreCaseInPath:      boolConfig(util.PrefixedEnvVar("IGNORE_CASE_IN_PATH"), true),
-		ShowServerHeader:      boolConfig(util.PrefixedEnvVar("SHOW_SERVER_HEADER"), true),
-		Port:                  uint16(port),
-		UpdatePeriod:          time.Duration(updatePeriod) * time.Second,
-		HttpCacheMaxAge:       uint32(httpCacheMaxAge),
-		CacheControlHeader:    fmt.Sprintf(CacheControlHeaderTemplate, httpCacheMaxAge),
-		StatusEndpointEnabled: !boolConfig(util.PrefixedEnvVar("DISABLE_STATUS"), false),
-		AdminCredentials:      createAdminCredentials(),
-		UseETag:               boolConfig(util.PrefixedEnvVar("ENABLE_ETAG"), true),
-		UseRedirectBody:       boolConfig(util.PrefixedEnvVar("ENABLE_REDIRECT_BODY"), true),
-		AllowRootRedirect:     boolConfig(util.PrefixedEnvVar("ALLOW_ROOT_REDIRECT"), true),
-		ShowRepositoryLink:    boolConfig(util.PrefixedEnvVar("SHOW_REPOSITORY_LINK"), false),
-		Favicons:              make(map[FaviconType]string),
-		FallbackFile:          os.Getenv(util.PrefixedEnvVar("FALLBACK_FILE")),
-		ApiEnabled:            boolConfig(util.PrefixedEnvVar("ENABLE_API"), false),
+		IgnoreCaseInPath:         boolConfig(util.PrefixedEnvVar("IGNORE_CASE_IN_PATH"), true),
+		ShowServerHeader:         boolConfig(util.PrefixedEnvVar("SHOW_SERVER_HEADER"), true),
+		Port:                     uint16(port),
+		UpdatePeriod:             time.Duration(updatePeriod) * time.Second,
+		HttpCacheMaxAge:          uint32(httpCacheMaxAge),
+		Favicons:                 make(map[FaviconType]string),
+		CacheControlHeader:       fmt.Sprintf(CacheControlHeaderTemplate, httpCacheMaxAge),
+		AssetsCacheControlHeader: fmt.Sprintf(CacheControlHeaderTemplate, 21600),
+		UseETag:                  boolConfig(util.PrefixedEnvVar("ENABLE_ETAG"), true),
+		UseRedirectBody:          boolConfig(util.PrefixedEnvVar("ENABLE_REDIRECT_BODY"), true),
+		UseAssets:                boolConfig(util.PrefixedEnvVar("ENABLE_ASSETS"), true), // Enables the serving of statis assets, see [tmpl.EmbedLocalFS]
+		AllowRootRedirect:        boolConfig(util.PrefixedEnvVar("ALLOW_ROOT_REDIRECT"), true),
+		ShowRepositoryLink:       boolConfig(util.PrefixedEnvVar("SHOW_REPOSITORY_LINK"), false),
+		StatusEndpointEnabled:    boolConfig(util.PrefixedEnvVar("ENABLE_STATUS"), true),
+		ApiEnabled:               boolConfig(util.PrefixedEnvVar("ENABLE_API"), false),
+		AdminCredentials:         createAdminCredentials(),
+		FallbackFile:             os.Getenv(util.PrefixedEnvVar("FALLBACK_FILE")),
 	}
 
 	rawFavicons := os.Getenv(util.PrefixedEnvVar("FAVICON"))

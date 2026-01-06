@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/fanonwue/go-short-link/internal"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/fanonwue/go-short-link/internal"
 )
 
 func main() {

@@ -30,8 +30,8 @@ type (
 	}
 
 	ParsedRequest struct {
-		Original       *http.Request
 		Target         string
+		OriginalPath   string
 		NormalizedPath string
 		Found          bool
 		InfoRequest    bool
@@ -147,7 +147,7 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 		srv.AddDefaultHeadersWithCache(responseHeader)
 
 		if conf.Config().UseETag {
-			etagData := redirectEtag(pr.NormalizedPath, pr.Target, "redirect")
+			etagData := util.RedirectEtag(pr.NormalizedPath, pr.Target, "redirect")
 			responseHeader.Set("ETag", srv.EtagFromData(etagData))
 		}
 
@@ -170,10 +170,10 @@ func FaviconHandler(w http.ResponseWriter, r *http.Request, favicon string) {
 
 func RedirectTargetForRequest(r *http.Request) *ParsedRequest {
 	pr := ParsedRequest{
-		Original: r,
+		OriginalPath: r.URL.Path,
 	}
 
-	normalizedPath, infoRequest := normalizeRedirectPath(r.URL.Path)
+	normalizedPath, infoRequest := normalizeRedirectPath(pr.OriginalPath)
 
 	pathEmpty := len(normalizedPath) == 0
 
@@ -221,19 +221,12 @@ func normalizeRedirectPath(path string) (string, bool) {
 	return path, infoRequest
 }
 
-func addLeadingSlash(s string) string {
-	if !strings.HasPrefix(s, "/") {
-		s = "/" + s
-	}
-	return s
-}
-
 func RedirectInfoHandler(w http.ResponseWriter, pr *ParsedRequest) {
 	// Pre initialize to the specified buffer size, as the response will be bigger than 1KiB due to the size of the template
 	renderedBuf := util.NewBuffer(conf.DefaultBufferSize)
 
 	err := redirectInfoTemplate.Execute(renderedBuf, &RedirectInfoTemplateData{
-		RedirectName: addLeadingSlash(pr.NormalizedPath),
+		RedirectName: pr.OriginalPath,
 		Target:       pr.Target,
 	})
 
@@ -241,7 +234,7 @@ func RedirectInfoHandler(w http.ResponseWriter, pr *ParsedRequest) {
 		logging.Errorf("Could not render redirect-info template: %v", err)
 	}
 
-	etagData := redirectEtag(pr.NormalizedPath, pr.Target, "info")
+	etagData := util.RedirectEtag(pr.NormalizedPath, pr.Target, "info")
 
 	srv.HtmlResponse(w, !pr.NoBodyRequest, http.StatusOK, renderedBuf, etagData)
 }
@@ -257,7 +250,7 @@ func NotFoundHandler(w http.ResponseWriter, pr *ParsedRequest) {
 	renderedBuf := util.NewBuffer(conf.DefaultBufferSize)
 
 	err := notFoundTemplate.Execute(renderedBuf, &NotFoundTemplateData{
-		RedirectName: addLeadingSlash(pr.NormalizedPath),
+		RedirectName: pr.OriginalPath,
 	})
 
 	if err != nil {
@@ -265,23 +258,6 @@ func NotFoundHandler(w http.ResponseWriter, pr *ParsedRequest) {
 	}
 
 	srv.HtmlResponse(w, !pr.NoBodyRequest, http.StatusNotFound, renderedBuf, "")
-}
-
-func redirectEtag(requestPath string, target string, suffix string) string {
-	var builder strings.Builder
-
-	// Pre-allocate capacity to avoid reallocations
-	// Estimate: len(requestPath) + len(target) + len(suffix) + 2 (for "#" characters)
-	builder.Grow(len(requestPath) + len(target) + len(suffix) + 2)
-
-	builder.WriteString(requestPath)
-	builder.WriteByte('#')
-	builder.WriteString(target)
-	builder.WriteByte('#')
-	builder.WriteString(suffix)
-
-	return builder.String()
-
 }
 
 func StartBackgroundUpdates(ctx context.Context) {
