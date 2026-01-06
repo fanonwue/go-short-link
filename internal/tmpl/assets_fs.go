@@ -4,6 +4,7 @@ import (
 	"embed"
 	"io/fs"
 	"os"
+	"sync"
 
 	"github.com/fanonwue/goutils/logging"
 )
@@ -53,22 +54,48 @@ func (elfs *EmbedLocalFS) FS() fs.FS { return elfs }
 
 func (elfs *EmbedLocalFS) EmbeddedFS() embed.FS { return elfs.embedded }
 func (elfs *EmbedLocalFS) LocalFS() *os.Root    { return elfs.local }
+func (elfs *EmbedLocalFS) LocalPath() string {
+	if elfs.local == nil {
+		return ""
+	}
+	return elfs.local.Name()
+}
 
 //go:embed assets
 var embeddedAssets embed.FS
 var assets *EmbedLocalFS
 
-func init() {
+// assets cannot be initialized more than once, so there is no need for a RWMutex
+var assetsMut = &sync.Mutex{}
+
+func CreateAssetsFS() *EmbedLocalFS {
 	localFs, err := os.OpenRoot(AssetsPathLocalFS)
 	if err != nil {
-		logging.Debugf("Could not open local file system, ignoring local FS: %v", err)
+		logging.Warnf("Could not open local file system, ignoring local FS: %v", err)
 	}
-	assets = &EmbedLocalFS{
+	return &EmbedLocalFS{
 		embedded: embeddedAssets,
 		local:    localFs,
 	}
 }
 
+// initAssetsFs will create an instance of AssetsFS. Only one instance can be active.
+// Use of a mutex ensures synchronization.
+func initAssetsFs() {
+	assetsMut.Lock()
+	defer assetsMut.Unlock()
+	// Check again under lock
+	if assets != nil {
+		return
+	}
+	assets = CreateAssetsFS()
+}
+
+// AssetsFS returns the shared instance of the active EmbedLocalFS, initializing it when needed.
+// Initialization is synchronized.
 func AssetsFS() *EmbedLocalFS {
+	if assets == nil {
+		initAssetsFs()
+	}
 	return assets
 }

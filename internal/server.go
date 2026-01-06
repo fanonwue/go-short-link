@@ -109,6 +109,11 @@ func defaultHandlerWithAssets(defaultHandler http.HandlerFunc) http.HandlerFunc 
 	if !conf.Config().UseAssets {
 		return defaultHandler
 	}
+	logging.Info("Asset handling is enabled, wrapping default handler with asset-aware handler")
+	localPath := tmpl.AssetsFS().LocalPath()
+	if localPath != "" {
+		logging.Infof("Assets are served from local file system: %s", localPath)
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		file, err := tmpl.AssetsFS().Open(r.URL.Path)
 		if err != nil {
