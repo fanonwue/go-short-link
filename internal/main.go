@@ -69,6 +69,8 @@ func templateFuncMap() template.FuncMap {
 		"currentTime":        currentTimeUtc,
 		"lastUpdate":         lastUpdateUtc,
 		"timestampFormat":    func() string { return time.RFC3339 },
+		"formatTimestamp":    func(t time.Time) string { return t.Format(time.RFC3339) },
+		"formatEpoch":        func(t time.Time) string { return strconv.FormatInt(t.UnixMilli(), 10) },
 		"favicons":           func() []conf.FaviconEntry { return conf.Config().FaviconEntries() },
 	}
 }

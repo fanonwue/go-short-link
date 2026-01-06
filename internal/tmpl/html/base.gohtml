@@ -67,10 +67,15 @@
     <footer id="footer">
         <hr>
         <p>
-            Page rendered at: <span id="render-time" class="timestamp" data-timestamp="{{currentTime.Format timestampFormat}}">
-                {{currentTime.Format timestampFormat}}</span><br>
-            Last mapping update: <span id="update-time" class="timestamp" data-timestamp="{{lastUpdate.Format timestampFormat}}">
-                {{lastUpdate.Format timestampFormat}}</span>
+            Page rendered at:
+            <span id="render-time" class="timestamp"
+                data-timestamp="{{formatTimestamp currentTime}}"
+                data-time="{{formatEpoch currentTime}}">{{currentTime.Format timestampFormat}}</span>
+            <br>
+            Last mapping update:
+            <span id="update-time" class="timestamp"
+               data-timestamp="{{formatTimestamp lastUpdate}}"
+               data-time="{{formatEpoch lastUpdate}}">{{lastUpdate.Format timestampFormat}}</span>
         </p>
         <p>
         {{if showServerName}}
