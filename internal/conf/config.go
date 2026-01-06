@@ -166,7 +166,7 @@ func CreateAppConfig() *AppConfig {
 		AssetsCacheControlHeader: fmt.Sprintf(CacheControlHeaderTemplate, 21600),
 		UseETag:                  boolConfig(util.PrefixedEnvVar("ENABLE_ETAG"), true),
 		UseRedirectBody:          boolConfig(util.PrefixedEnvVar("ENABLE_REDIRECT_BODY"), true),
-		UseAssets:                boolConfig(util.PrefixedEnvVar("ENABLE_ASSETS"), true), // Enables the serving of statis assets, see [tmpl.EmbedLocalFS]
+		UseAssets:                boolConfig(util.PrefixedEnvVar("ENABLE_ASSETS"), false), // Enables the serving of statis assets, see [tmpl.EmbedLocalFS]
 		AllowRootRedirect:        boolConfig(util.PrefixedEnvVar("ALLOW_ROOT_REDIRECT"), true),
 		ShowRepositoryLink:       boolConfig(util.PrefixedEnvVar("SHOW_REPOSITORY_LINK"), false),
 		StatusEndpointEnabled:    boolConfig(util.PrefixedEnvVar("ENABLE_STATUS"), true),
