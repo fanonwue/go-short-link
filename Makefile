@@ -30,7 +30,7 @@ endif
 GOAMD64 ?= v2
 
 BUILD_DATE ?= $(shell date '+%Y-%m-%dT%H:%M:%S%z')
-LD_FLAGS := $(LD_FLAGS) -X 'github.com/fanonwue/go-short-link/internal/build.Timestamp=$(BUILD_DATE)'
+LD_FLAGS := $(LD_FLAGS) -X 'github.com/fanonwue/goutils/buildinfo.timestamp=$(BUILD_DATE)'
 
 build:
 	go build -tags $(GO_TAGS) -o bin/$(EXECUTABLE_NAME) --ldflags="$(LD_FLAGS)" $(ADDITIONAL_FLAGS)

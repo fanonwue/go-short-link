@@ -3,7 +3,7 @@ module github.com/fanonwue/go-short-link
 go 1.25
 
 require (
-	github.com/fanonwue/goutils v0.1.2
+	github.com/fanonwue/goutils v0.1.3
 	github.com/joho/godotenv v1.5.1
 	github.com/tdewolff/minify/v2 v2.24.8
 	golang.org/x/crypto v0.46.0
