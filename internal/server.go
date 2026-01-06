@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"slices"
@@ -115,22 +115,24 @@ func defaultHandlerWithAssets(defaultHandler http.HandlerFunc) http.HandlerFunc 
 		logging.Infof("Assets are served from local file system: %s", localPath)
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		file, err := tmpl.AssetsFS().Open(r.URL.Path)
+		assetFile, err := tmpl.AssetsFS().OpenAssetFile(r.URL.Path)
 		if err != nil {
+			acceptedError := errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrPermission)
+			if !acceptedError {
+				logging.Errorf("Unhandled error while handling asset request: %v", err)
+			}
+
 			defaultHandler(w, r)
 			return
 		}
-		defer file.Close()
-
-		stat, _ := file.Stat()
-		reader, ok := file.(io.ReadSeeker)
-		if !ok {
-			logging.Errorf("File does not implement io.ReadSeeker: %s", r.URL.Path)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
+		defer assetFile.Close()
 		srv.AddDefaultHeadersAssets(w.Header())
-		http.ServeContent(w, r, r.URL.Path, stat.ModTime(), reader)
+		defaultTimestamp, _ := conf.BuildTimestamp()
+		modTime, statErr := assetFile.ModTimeOrDefault(defaultTimestamp)
+		if statErr != nil {
+			logging.Errorf("Could not stat asset file %s: %v", r.URL.Path, statErr)
+		}
+		http.ServeContent(w, r, r.URL.Path, modTime, assetFile)
 	}
 }
 
