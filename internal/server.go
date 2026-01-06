@@ -134,7 +134,7 @@ func defaultHandlerWithAssets(defaultHandler http.HandlerFunc) http.HandlerFunc 
 	}
 }
 
-func CreateHttpServer(shutdown chan<- error, ctx context.Context) *http.Server {
+func CreateHttpServer(ctx context.Context) *http.Server {
 	logging.Infof("Starting HTTP server on port %d", conf.Config().Port)
 
 	mux := http.NewServeMux()
@@ -168,17 +168,6 @@ func CreateHttpServer(shutdown chan<- error, ctx context.Context) *http.Server {
 		},
 	}
 
-	go func() {
-		defer close(shutdown)
-		err := httpServer.ListenAndServe()
-		logging.Debugf("HTTP Server closed")
-		if !errors.Is(err, http.ErrServerClosed) {
-			logging.Errorf("Error creating server: %v", err)
-			shutdown <- err
-		} else {
-			shutdown <- nil
-		}
-	}()
 	return httpServer
 }
 

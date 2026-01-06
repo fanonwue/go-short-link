@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"html/template"
 	"net/http"
 	"strconv"
@@ -354,8 +355,9 @@ func OnExit(messages ...string) {
 func Run(ctx context.Context) error {
 	Setup(ctx)
 
-	shutdownChan := make(chan error)
-	server = CreateHttpServer(shutdownChan, ctx)
+	server = CreateHttpServer(ctx)
+
+	go startServer(server)
 
 	select {
 	case <-ctx.Done():
@@ -367,6 +369,18 @@ func Run(ctx context.Context) error {
 			return err
 		}
 	}
+	return nil
+}
 
-	return <-shutdownChan
+func startServer(srv *http.Server) {
+	err := srv.ListenAndServe()
+	defer func() {
+		closeErr := srv.Close()
+		if closeErr != nil {
+			logging.Errorf("Error closing server: %v", closeErr)
+		}
+	}()
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		panic(err)
+	}
 }
