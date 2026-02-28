@@ -1,6 +1,6 @@
 module github.com/fanonwue/go-short-link
 
-go 1.25
+go 1.26
 
 require (
 	github.com/fanonwue/goutils v0.1.3
