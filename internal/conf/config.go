@@ -23,15 +23,16 @@ type (
 	}
 
 	AppConfig struct {
-		IgnoreCaseInPath         bool
-		ShowServerHeader         bool
-		Port                     uint16
-		UpdatePeriod             time.Duration
-		HttpCacheMaxAge          uint32
+		Favicons                 map[FaviconType]string
+		AdminCredentials         *AdminCredentials
 		CacheControlHeader       string
 		AssetsCacheControlHeader string
 		FallbackFile             string
-		Favicons                 map[FaviconType]string
+		UpdatePeriod             time.Duration
+		HttpCacheMaxAge          uint32
+		Port                     uint16
+		IgnoreCaseInPath         bool
+		ShowServerHeader         bool
 		UseAssets                bool
 		UseETag                  bool
 		UseRedirectBody          bool
@@ -39,7 +40,6 @@ type (
 		ShowRepositoryLink       bool
 		StatusEndpointEnabled    bool
 		ApiEnabled               bool
-		AdminCredentials         *AdminCredentials
 	}
 
 	FaviconEntry struct {
