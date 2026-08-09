@@ -12,7 +12,7 @@
 
 {{define "sharedHead"}}
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width" />
+    <meta name="viewport" content="width=device-width">
     <style>
         :root {
             --bg-color: #f0f0f0;
@@ -102,11 +102,10 @@
                     timeZoneName: "short"
                 })
             }
-
+            
             document.querySelectorAll(".timestamp").forEach(el => {
-                el.innerText = utcToLocal(el.dataset.timestamp ?? el.innerText)
+                el.innerText = utcToLocal(el.dataset.timestamp || el.innerText)
             })
-
         </script>
     </footer>
 {{end}}
