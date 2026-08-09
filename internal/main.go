@@ -63,14 +63,16 @@ func templateFuncMap() template.FuncMap {
 
 	serverName := strings.ToUpper(conf.ServerIdentifierHeader)
 
+	timestampFormat := time.RFC3339Nano
+
 	return template.FuncMap{
 		"showRepositoryLink": func() bool { return conf.Config().ShowRepositoryLink },
 		"showServerName":     func() bool { return conf.Config().ShowServerHeader },
 		"serverName":         func() string { return serverName },
 		"currentTime":        currentTimeUtc,
 		"lastUpdate":         lastUpdateUtc,
-		"timestampFormat":    func() string { return time.RFC3339 },
-		"formatTimestamp":    func(t time.Time) string { return t.Format(time.RFC3339) },
+		"timestampFormat":    func() string { return timestampFormat },
+		"formatTimestamp":    func(t time.Time) string { return t.Format(timestampFormat) },
 		"formatEpoch":        func(t time.Time) string { return strconv.FormatInt(t.UnixMilli(), 10) },
 		"favicons":           func() []conf.FaviconEntry { return conf.Config().FaviconEntries() },
 	}
