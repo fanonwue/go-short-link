@@ -14,6 +14,20 @@ type (
 	}
 )
 
+type RedirectPath string
+
+func (rp RedirectPath) String() string {
+	return string(rp)
+}
+
+func (rp RedirectPath) Prefixed() string {
+	s := rp.String()
+	if strings.HasPrefix("/", s) {
+		return s
+	}
+	return "/" + s
+}
+
 const templatePathPrefix = "html/"
 const BaseTemplateName = "base.gohtml"
 

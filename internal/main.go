@@ -22,11 +22,11 @@ import (
 
 type (
 	NotFoundTemplateData struct {
-		RedirectName string
+		RedirectName tmpl.RedirectPath
 	}
 
 	RedirectInfoTemplateData struct {
-		RedirectName string
+		RedirectName tmpl.RedirectPath
 		Target       string
 	}
 
@@ -235,7 +235,7 @@ func RedirectInfoHandler(w http.ResponseWriter, pr *ParsedRequest) {
 	renderedBuf := util.NewBuffer(conf.DefaultBufferSize)
 
 	err := redirectInfoTemplate.Execute(renderedBuf, &RedirectInfoTemplateData{
-		RedirectName: pr.OriginalPath,
+		RedirectName: tmpl.RedirectPath(pr.NormalizedPath),
 		Target:       pr.Target,
 	})
 
@@ -259,7 +259,7 @@ func NotFoundHandler(w http.ResponseWriter, pr *ParsedRequest) {
 	renderedBuf := util.NewBuffer(conf.DefaultBufferSize)
 
 	err := notFoundTemplate.Execute(renderedBuf, &NotFoundTemplateData{
-		RedirectName: pr.OriginalPath,
+		RedirectName: tmpl.RedirectPath(pr.OriginalPath),
 	})
 
 	if err != nil {
