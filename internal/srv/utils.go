@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 
 	"github.com/fanonwue/go-short-link/internal/conf"
@@ -95,11 +95,11 @@ func StatusResponse(
 	return nil
 }
 
-func JsonResponse(w http.ResponseWriter, r *http.Request, body any, status int) error {
+func JsonResponse[T any](w http.ResponseWriter, r *http.Request, body T, status int) error {
 	return StatusResponse(w, r, status, func() (string, *bytes.Buffer, error) {
 		contentType := "application/json; charset=utf-8"
 		buf := util.NewBuffer(conf.DefaultBufferSize)
-		err := json.NewEncoder(buf).Encode(body)
+		err := json.MarshalWrite(buf, body)
 		if err != nil {
 			return contentType, buf, err
 		}

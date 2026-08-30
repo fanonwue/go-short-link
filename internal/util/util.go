@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/fanonwue/goutils"
+	"github.com/fanonwue/goutils/logging"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -50,5 +51,12 @@ func RedirectEtag(requestPath string, target string, suffix string) string {
 	builder.WriteString(suffix)
 
 	return builder.String()
+}
 
+func FileCloseErrorHandler(err error) {
+	if err == nil {
+		return
+	}
+
+	logging.Errorf("Error closing file: %v", err)
 }
