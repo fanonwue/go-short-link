@@ -115,7 +115,9 @@ func writeFallbackFile(path string, newMapping state.RedirectMap) error {
 	if err != nil {
 		return err
 	}
-	defer util.FileCloseErrorHandler(file.Close())
+	defer func() {
+		util.FileCloseErrorHandler(file.Close())
+	}()
 
 	jsonEntries := make([]FallbackFileEntry, 0, len(newMapping))
 
@@ -168,7 +170,9 @@ func readFallbackFile(path string) ([]FallbackFileEntry, error) {
 		logging.Warnf("Error opening fallback file: %v", err)
 		return nil, err
 	}
-	defer util.FileCloseErrorHandler(file.Close())
+	defer func() {
+		util.FileCloseErrorHandler(file.Close())
+	}()
 
 	var entries []FallbackFileEntry
 	err = json.UnmarshalRead(file, &entries)
