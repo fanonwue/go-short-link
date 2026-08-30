@@ -25,7 +25,7 @@ func (ds *CsvDataSource) LastUpdate() time.Time {
 }
 
 func (ds *CsvDataSource) LastModified() time.Time {
-	fileInfo, err := withFile(ds, func(f fs.File) (fs.FileInfo, error) {
+	fileInfo, err := ds.withFile(func(f fs.File) (fs.FileInfo, error) {
 		return f.Stat()
 	})
 	if err != nil {
@@ -52,8 +52,8 @@ func (ds *CsvDataSource) NeedsUpdate() bool {
 }
 
 func (ds *CsvDataSource) FetchRedirectMapping() (state.RedirectMap, error) {
-	return withFile(ds, func(f fs.File) (state.RedirectMap, error) {
-		return fetchRedirectMappingInternal(ds, f)
+	return ds.withFile(func(f fs.File) (state.RedirectMap, error) {
+		return ds.fetchRedirectMappingInternal(f)
 	})
 }
 
@@ -61,7 +61,7 @@ func (ds *CsvDataSource) Id() string {
 	return "CsvDataSource#" + ds.filePath
 }
 
-func fetchRedirectMappingInternal(ds *CsvDataSource, f fs.File) (state.RedirectMap, error) {
+func (ds *CsvDataSource) fetchRedirectMappingInternal(f fs.File) (state.RedirectMap, error) {
 	redirectMap := state.RedirectMap{}
 	updateTime := time.Now().UTC()
 
@@ -95,10 +95,7 @@ func fetchRedirectMappingInternal(ds *CsvDataSource, f fs.File) (state.RedirectM
 
 // withFile is a helper function that opens a file and calls a callback function with it. Internally, it uses [goutils.WithFile]
 // to ensure that the file is closed after the callback has finished.
-//
-// Due to the generic nature of this function, it cannot be turned into a method on [CsvDataSource]. Go does not allow generic methods
-// on types without type parameters, like [CsvDataSource]
-func withFile[T any](ds *CsvDataSource, callback func(f fs.File) (T, error)) (T, error) {
+func (ds *CsvDataSource) withFile[T any](callback func(f fs.File) (T, error)) (T, error) {
 	return goutils.WithFile(ds.filePath, func(file *os.File) (T, error) {
 		return callback(file)
 	})
