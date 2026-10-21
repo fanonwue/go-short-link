@@ -10,7 +10,7 @@ ENV CGO_ENABLED=0
 WORKDIR $WORKDIR
 
 # make is needed for the Makefile
-RUN apk update && apk upgrade && apk add --no-cache \
+RUN apk add --no-cache \
     ca-certificates \
     tzdata \
     make
@@ -18,11 +18,14 @@ RUN apk update && apk upgrade && apk add --no-cache \
 RUN update-ca-certificates
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum Makefile ./
-RUN make deps
+RUN --mount=type=cache,target=/go/pkg/mod \
+    make deps
 
 COPY . .
 # Run go build and strip symbols / debug info
-RUN make build
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    make build
 
 FROM scratch
 ARG WORKDIR
