@@ -11,11 +11,10 @@ WORKDIR $WORKDIR
 
 # make is needed for the Makefile
 RUN apk add --no-cache \
-    ca-certificates \
+    ca-certificates-bundle \
     tzdata \
     make
 
-RUN update-ca-certificates
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum Makefile ./
 RUN --mount=type=cache,target=/go/pkg/mod \
