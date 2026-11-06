@@ -3,6 +3,7 @@ name: build-container
 on:
   push:
     branches: [master]
+  workflow_dispatch:
 #  schedule:
 #    # do daily builds
 #    - cron: '0 0 * * *'
