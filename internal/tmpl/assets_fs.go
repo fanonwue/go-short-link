@@ -6,10 +6,9 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"sync"
-	"sync/atomic"
 	"time"
 
+	"github.com/fanonwue/goutils"
 	"github.com/fanonwue/goutils/logging"
 )
 
@@ -158,8 +157,7 @@ func openEmbeddedFile(fsys fs.FS, name string) (AssetFile, error) {
 var (
 	//go:embed assets
 	embeddedAssets embed.FS
-	assets         atomic.Pointer[EmbedLocalFS]
-	assetsMut      sync.Mutex
+	assets         = goutils.NewLazy(createAssetsFS)
 )
 
 func createAssetsFS() *EmbedLocalFS {
@@ -175,23 +173,12 @@ func createAssetsFS() *EmbedLocalFS {
 
 // AssetsFS returns the shared instance of the active EmbedLocalFS, initializing it on first use.
 func AssetsFS() *EmbedLocalFS {
-	if a := assets.Load(); a != nil {
-		return a
-	}
-	assetsMut.Lock()
-	defer assetsMut.Unlock()
-	// Re-check condition under lock to check whether it was created while we were waiting for the lock
-	if a := assets.Load(); a != nil {
-		return a
-	}
-	a := createAssetsFS()
-	assets.Store(a)
-	return a
+	return assets.Get()
 }
 
 // CloseAssetsFS closes the shared instance if it was ever created.
 func CloseAssetsFS() error {
-	if a := assets.Load(); a != nil {
+	if a, ok := assets.Peek(); a != nil && ok {
 		logging.Infof("Closing assets FS")
 		return a.Close()
 	}
