@@ -31,10 +31,10 @@ func ComparePasswords(rawPassword, hashedPassword []byte) error {
 }
 
 func AddLeadingSlash(s string) string {
-	if !strings.HasPrefix(s, "/") {
-		s = "/" + s
+	if strings.HasPrefix(s, "/") {
+		return s
 	}
-	return s
+	return "/" + s
 }
 
 func RedirectEtag(requestPath string, target string, suffix string) string {

@@ -5,6 +5,8 @@ import (
 	"io/fs"
 	"path"
 	"strings"
+
+	"github.com/fanonwue/go-short-link/internal/util"
 )
 
 type (
@@ -21,11 +23,7 @@ func (rp RedirectPath) String() string {
 }
 
 func (rp RedirectPath) Prefixed() string {
-	s := rp.String()
-	if strings.HasPrefix(s, "/") {
-		return s
-	}
-	return "/" + s
+	return util.AddLeadingSlash(rp.String())
 }
 
 const templatePathPrefix = "html/"
