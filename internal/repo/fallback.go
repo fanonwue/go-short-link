@@ -2,6 +2,7 @@ package repo
 
 import (
 	"encoding/json/v2"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -28,15 +29,6 @@ func writeFallbackFile(path string, newMapping state.RedirectMap) error {
 		return err
 	}
 
-	tmpFile, err := os.CreateTemp("", "fallback-*.json")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmpFile.Name()
-	defer func() {
-		_ = os.Remove(tmpPath)
-	}()
-
 	jsonEntries := make([]FallbackFileEntry, 0, len(newMapping))
 
 	for key, target := range newMapping {
@@ -46,59 +38,9 @@ func writeFallbackFile(path string, newMapping state.RedirectMap) error {
 		})
 	}
 
-	err = json.MarshalWrite(tmpFile, jsonEntries)
-	closeErr := tmpFile.Close()
-	if err != nil {
-		return err
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-
-	err = os.Chmod(tmpPath, 0644)
-	if err != nil {
-		return err
-	}
-
-	return replaceFile(tmpPath, path)
-}
-
-func replaceFile(src string, dst string) error {
-	if os.Rename(src, dst) == nil {
-		return nil
-	}
-
-	// Rename fails across filesystems (e.g. when /tmp is a separate mount), so stage a copy next to dst
-	// and rename that instead, keeping the final replacement atomic
-	data, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-
-	staged, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+".*.tmp")
-	if err != nil {
-		return err
-	}
-	stagedPath := staged.Name()
-	defer func() {
-		_ = os.Remove(stagedPath)
-	}()
-
-	_, err = staged.Write(data)
-	closeErr := staged.Close()
-	if err != nil {
-		return err
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-
-	err = os.Chmod(stagedPath, 0644)
-	if err != nil {
-		return err
-	}
-
-	return os.Rename(stagedPath, dst)
+	return writeFallbackContent(path, func(writer io.Writer) error {
+		return json.MarshalWrite(writer, jsonEntries)
+	})
 }
 
 func writeFallbackFileLog(path string, newMapping state.RedirectMap) error {

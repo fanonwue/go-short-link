@@ -20,6 +20,11 @@ ifneq (, $(filter $(MINIFY), $(TRUTHY_VALUES)))
 	GO_TAGS := $(GO_TAGS),minify
 endif
 
+# Write the fallback file via a temporary file and atomic rename instead of writing it in place
+ifneq (, $(filter $(ATOMIC_FALLBACK), $(TRUTHY_VALUES)))
+	GO_TAGS := $(GO_TAGS),atomicfallback
+endif
+
 EXECUTABLE_NAME := go-short-link
 ifeq ($(GOOS), windows)
 	EXECUTABLE_NAME := $(EXECUTABLE_NAME).exe
