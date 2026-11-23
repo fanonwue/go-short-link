@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fanonwue/goutils/logging"
@@ -130,6 +131,15 @@ func (elfs *EmbedLocalFS) LocalPath() string {
 	return elfs.local.Name()
 }
 
+// Close releases the resources held by the local file system, if any.
+// The embedded assets need no cleanup. Close is safe to call on an instance without a local FS.
+func (elfs *EmbedLocalFS) Close() error {
+	if elfs.local == nil {
+		return nil
+	}
+	return elfs.local.Close()
+}
+
 func openEmbeddedFile(fsys fs.FS, name string) (AssetFile, error) {
 	file, err := fsys.Open(AssetsPathPrefix + name)
 	if err != nil {
@@ -145,14 +155,14 @@ func openEmbeddedFile(fsys fs.FS, name string) (AssetFile, error) {
 	}, err
 }
 
-//go:embed assets
-var embeddedAssets embed.FS
-var assets *EmbedLocalFS
+var (
+	//go:embed assets
+	embeddedAssets embed.FS
+	assets         atomic.Pointer[EmbedLocalFS]
+	assetsMut      sync.Mutex
+)
 
-// assets cannot be initialized more than once, so there is no need for a RWMutex
-var assetsMut = &sync.Mutex{}
-
-func CreateAssetsFS() *EmbedLocalFS {
+func createAssetsFS() *EmbedLocalFS {
 	localFs, err := os.OpenRoot(AssetsPathLocalFS)
 	if err != nil {
 		logging.Warnf("Could not open local file system, ignoring local FS: %v", err)
@@ -163,23 +173,27 @@ func CreateAssetsFS() *EmbedLocalFS {
 	}
 }
 
-// initAssetsFs will create an instance of AssetsFS. Only one instance can be active.
-// Use of a mutex ensures synchronization.
-func initAssetsFs() {
+// AssetsFS returns the shared instance of the active EmbedLocalFS, initializing it on first use.
+func AssetsFS() *EmbedLocalFS {
+	if a := assets.Load(); a != nil {
+		return a
+	}
 	assetsMut.Lock()
 	defer assetsMut.Unlock()
-	// Check again under lock
-	if assets != nil {
-		return
+	// Re-check condition under lock to check whether it was created while we were waiting for the lock
+	if a := assets.Load(); a != nil {
+		return a
 	}
-	assets = CreateAssetsFS()
+	a := createAssetsFS()
+	assets.Store(a)
+	return a
 }
 
-// AssetsFS returns the shared instance of the active EmbedLocalFS, initializing it when needed.
-// Initialization is synchronized.
-func AssetsFS() *EmbedLocalFS {
-	if assets == nil {
-		initAssetsFs()
+// CloseAssetsFS closes the shared instance if it was ever created.
+func CloseAssetsFS() error {
+	if a := assets.Load(); a != nil {
+		logging.Infof("Closing assets FS")
+		return a.Close()
 	}
-	return assets
+	return nil
 }

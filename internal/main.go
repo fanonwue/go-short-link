@@ -370,6 +370,10 @@ func Run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		// Only close assets once no handler can be using them anymore
+		if err = tmpl.CloseAssetsFS(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
