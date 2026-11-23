@@ -35,10 +35,13 @@ section for further details on which options are supported.
 
 In the `volumes` section, you can specify a fallback file to be used in case the primary source of links (for example,
 Google Sheets) is temporarily unavailable. This is useful in case of a temporary outage, see [](#using-a-fallback-file)
-for more information. 
+for more information.
 The mapping `./secret:/opt/app/secret:ro`
 is used to mount a secret directory containing the private key for the service account. This is required to access the
 Google API. Refer to the [](#configuring-google-spreadsheets) section for more information.
+
+The container runs the application as user `3000`. Make sure this user has access to every mounted file or directory
+the application needs to write to, including the [configured fallback file](#using-a-fallback-file).
 
 ## Building from source
 
@@ -241,6 +244,7 @@ first run it will load that snapshot and serve it immediately.
 As described in the [configuration](#configuration-table) table, the fallback file can be configured using the `APP_FALLBACK_FILE`
 environment variable.
 
+Remember to ensure that the user running the container (UID `3000`) has write access to the configured fallback file.
 
 (special-redirection-names)=
 ## Special redirection names

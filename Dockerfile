@@ -27,6 +27,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     make build
 
 FROM scratch
+ARG UID=3000
+ARG GID=3000
 ARG WORKDIR
 ENV APP_ENV=production
 WORKDIR $WORKDIR
@@ -39,5 +41,6 @@ COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder $WORKDIR/bin/go-short-link .
 
 EXPOSE 3000
+USER $UID:$GID
 
 ENTRYPOINT ["./go-short-link"]
